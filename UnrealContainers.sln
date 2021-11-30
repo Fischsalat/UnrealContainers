@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31515.178
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnrealContainers", "UnrealContainers\UnrealContainers.vcxproj", "{66509082-6345-495C-915B-62E2F64AF13C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{66509082-6345-495C-915B-62E2F64AF13C}.Debug|x64.ActiveCfg = Debug|x64
+		{66509082-6345-495C-915B-62E2F64AF13C}.Debug|x64.Build.0 = Debug|x64
+		{66509082-6345-495C-915B-62E2F64AF13C}.Debug|x86.ActiveCfg = Debug|Win32
+		{66509082-6345-495C-915B-62E2F64AF13C}.Debug|x86.Build.0 = Debug|Win32
+		{66509082-6345-495C-915B-62E2F64AF13C}.Release|x64.ActiveCfg = Release|x64
+		{66509082-6345-495C-915B-62E2F64AF13C}.Release|x64.Build.0 = Release|x64
+		{66509082-6345-495C-915B-62E2F64AF13C}.Release|x86.ActiveCfg = Release|Win32
+		{66509082-6345-495C-915B-62E2F64AF13C}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {82EA4A35-DAE9-4FB6-AB39-7468C9C9E347}
+	EndGlobalSection
+EndGlobal
