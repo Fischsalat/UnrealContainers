@@ -1,6 +1,6 @@
 #pragma once
 
-namespace UE4
+namespace UE
 {
 	typedef __int8 int8;
 	typedef __int16 int16;
@@ -38,7 +38,7 @@ namespace UE4
 		}
 		inline void Reset(int MinSizeAfterReset = 0)
 		{
-			if (Max >= MinSizeAfterReset)
+			if (MaxElements >= MinSizeAfterReset)
 			{
 				Count = 0;
 
@@ -171,11 +171,47 @@ namespace UE4
 		}
 	};
 
+	template<int32 NumElements>
+	class TInlineAllocator
+	{
+	private:
+		template<int32 Size, int32 Alignment>
+		struct alignas(Alignment) TAlligendBytes
+		{
+			uint8 Pad[Size];
+		};
+
+		template<typename ElementType>
+		struct TTypeCompatibleBytes : public TAlligendBytes<sizeof(ElementType), alignof(ElementType)>
+		{
+		};
+
+	public:
+		template<typename ElementType>
+		class ForElementType
+		{
+		private:
+			TTypeCompatibleBytes<ElementType> InlineData[NumElements];
+
+			void* SecondaryData;
+
+		public:
+			FORCEINLINE ElementType& operator[](int32 Index)
+			{
+				return *(ElementType*)(&InlineData[Index]);
+			}
+			FORCEINLINE const ElementType& operator[](int32 Index) const
+			{
+				return *(ElementType*)(&InlineData[Index]);
+			}
+		};
+	};
+
 	class TBitArray
 	{
 
 	private:
-		uint32* Data;
+		TInlineAllocator<4>::ForElementType<uint32> Data;
 		int32 NumBits;
 		int32 MaxBits;
 
@@ -196,6 +232,10 @@ namespace UE4
 		{
 			FORCEINLINE FBitReference(uint32& InData, uint32 InMask)
 				: Data(InData), Mask(InMask)
+			{
+			}
+			FORCEINLINE const FBitReference(const uint32& InData, const uint32 InMask)
+				: Data(const_cast<uint32&>(InData)), Mask(InMask)
 			{
 			}
 
@@ -408,7 +448,7 @@ namespace UE4
 	{
 		TSparseArray<SetType> Elements;
 
-		mutable void* Hash;
+		mutable TInlineAllocator<1>::ForElementType<int> Hash;
 		mutable int32 HashSize;
 
 		template<typename ItSetType>
@@ -478,9 +518,11 @@ namespace UE4
 	template<typename KeyType, typename ValueType>
 	class TPair
 	{
-	public:
+	private:
 		KeyType First;
 		ValueType Second;
+
+	public:
 
 		FORCEINLINE KeyType& Key()
 		{
@@ -556,38 +598,23 @@ namespace UE4
 			return TBaseIterator<ElementType>(*this, Pairs.end());
 		}
 
-		template<typename ComparisonFunction>
-		FORCEINLINE ValueType& operator[](const KeyType& Key)
+		FORCEINLINE ElementType& operator[](const KeyType& Key)
 		{
 			return this->GetByKey(Key);
 		}
-		template<typename ComparisonFunction>
-		FORCEINLINE const ValueType& operator[](const KeyType& Key) const
+		FORCEINLINE const ElementType& operator[](const KeyType& Key) const
 		{
 			return this->GetByKey(Key);
 		}
 
 		template<typename ComparisonFunction>
-		FORCEINLINE ValueType& GetByKey(const KeyType& Key, ComparisonFunction* comp = nullptr)
+		FORCEINLINE ElementType& GetByKey(const KeyType& Key, ComparisonFunction* comp = nullptr)
 		{
-			if (comp)
+			for (ElementType Pair : *this)
 			{
-				for (ElementType Pair : *this)
+				if (comp ? comp(Pair.First, Key) : Pair.Key() == Key)
 				{
-					if (comp(Pair.First, Key))
-					{
-						return Pair.Second;
-					}
-				}
-			}
-			else
-			{
-				for (ElementType Pair : *this)
-				{
-					if (Pair.Key == Key)
-					{
-						return Pair.Second;
-					}
+					return Pair;
 				}
 			}
 		}
