@@ -169,8 +169,18 @@ namespace UE
 
 			return str;
 		}
+		inline void Free()
+		{
+			static auto FreeInternal = reinterpret_cast<void(*)(void*)>(uintptr_t(GetModuleHandle(0)) + 0x10AC0F0);
+
+			FreeInternal(Data);
+			Data = nullptr;
+			Count = 0;
+			MaxElements = 0;
+		}
 	};
 
+	//Allocates Elements directly where the instance is created rather than on the heap
 	template<int32 NumElements>
 	class TInlineAllocator
 	{
@@ -203,6 +213,23 @@ namespace UE
 			FORCEINLINE const ElementType& operator[](int32 Index) const
 			{
 				return *(ElementType*)(&InlineData[Index]);
+			}
+
+			FORCEINLINE ElementType& GetInlinElement(int32 Index)
+			{
+				return *(ElementType*)(&InlineData[Index]);
+			}
+			FORCEINLINE const ElementType& GetInlinElement(int32 Index) const
+			{
+				return *(ElementType*)(&InlineData[Index]);
+			}
+			FORCEINLINE ElementType& GetSecondaryElement(int32 Index)
+			{
+				return (ElementType)SecondaryData[Index];
+			}
+			FORCEINLINE const ElementType& GetSecondaryElement(int32 Index) const
+			{
+				return (ElementType)SecondaryData[Index];
 			}
 		};
 	};
@@ -447,8 +474,8 @@ namespace UE
 	class TSet
 	{
 		TSparseArray<SetType> Elements;
-
-		mutable TInlineAllocator<1>::ForElementType<int> Hash;
+		
+		mutable TInlineAllocator<1>::ForElementType<int> Hash; //16
 		mutable int32 HashSize;
 
 		template<typename ItSetType>

@@ -139,6 +139,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CLASSES_FOR_TESTING.h" />
     <ClInclude Include="Containers.h" />
   </ItemGroup>
   <ItemGroup>

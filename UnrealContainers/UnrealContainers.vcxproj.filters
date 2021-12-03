@@ -18,6 +18,9 @@
     <ClInclude Include="Containers.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="CLASSES_FOR_TESTING.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Mein.cpp">
