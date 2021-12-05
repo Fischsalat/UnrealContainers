@@ -1,6 +1,7 @@
 #pragma once
 #include <Windows.h>
 #include <iostream>
+#include <format>
 #include "Containers.h"
 #include "CLASSES_FOR_TESTING.h"
 
@@ -11,9 +12,10 @@ void GetSize()
     std::cout << sizeof(TArray<int>) << "\n";       // 16 / 16 Working
     std::cout << sizeof(TBitArray) << "\n";         // 32 / 32 Working
     std::cout << sizeof(TSparseArray<int>) << "\n"; // 56 / 56 Not Tested
-    std::cout << sizeof(TSet<int>) << "\n";         // 80 / 80 Not Tested
-    std::cout << sizeof(TMap<int, float>) << "\n";  // 80 / 80 Not Tested
+    //std::cout << sizeof(TSet<int>) << "\n";         // 80 / 80 Not Tested
+    //std::cout << sizeof(TMap<int, float>) << "\n";  // 80 / 80 Not Tested
 }
+
 
 void Main()
 {
@@ -37,13 +39,38 @@ void Main()
         {
             std::cout << current << "\n";
 
-            TSparseArray<TPair<uint8, int32>>& mySparse = *(TSparseArray<TPair<uint8, int32>>*)((uint8*)current + 0x138);
+            TSparseArray<TPair<int32, int32>>& myArray = *(TSparseArray<TPair<int32, int32>>*)((uint8*)current + 0x138);
+            TSet<TPair<int32, int32>>& mySet = *(TSet<TPair<int32, int32>>*)((uint8*)current + 0x138);
+            TMap<int32, int32>& myMap = *(TMap<int32, int32>*)((uint8*)current + 0x138);
+            TBitArray& myBits = *(TBitArray*)((uint8*)current + 0x148);
 
-            std::cout << &mySparse;
             std::cout << "\n";
             
             int unfunnytestint = 0;
 
+            std::cout << "\nTBitAray:\n";
+            for (auto element : myBits)
+            {
+                std::cout << (element ? "True\n" : "False\n");
+            }
+
+            std::cout << "\nTSparseArray:\n";
+            for (auto element : myArray)
+            {
+                std::cout << element.Key() << "\t" << element.Value() << "\n";
+            }
+
+            std::cout << "\nTSet:\n";
+            for (auto element : mySet)
+            {
+                std::cout << element.Value.Key() << "\t" << element.Value.Value() << "\n";
+            }
+
+            std::cout << "\nTMap:\n";
+            for (auto element : myMap)
+            {
+                std::cout << element.Value.Key() << "\t" << element.Value.Value() << "\n";
+            }
 
         }
     }

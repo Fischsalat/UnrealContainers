@@ -279,6 +279,7 @@ namespace UE
 	public:
 		class FBitIterator : public FRelativeBitReference
 		{
+		public:
 			int32 Index;
 			const TBitArray& IteratedArray;
 
@@ -288,7 +289,7 @@ namespace UE
 			{
 			}
 			FORCEINLINE const FBitIterator(const TBitArray& ToIterate) //End
-				: IteratedArray(ToIterate), Index(ToIterate.MaxBits), FRelativeBitReference(ToIterate.MaxBits)
+				: IteratedArray(ToIterate), Index(ToIterate.NumBits), FRelativeBitReference(ToIterate.NumBits)
 			{
 			}
 
@@ -318,12 +319,7 @@ namespace UE
 			FORCEINLINE bool operator!=(const FBitIterator& OtherIt) const
 			{
 				return Index != OtherIt.Index;
-			}/*
-			FORCEINLINE FBitIterator& operator=(const FBitIterator& Other)
-			{
-				IteratedArray = Other.IteratedArray;
-				Index = Other.Index;
-			}*/
+			}
 
 			FORCEINLINE int32 GetIndex() const
 			{
@@ -379,6 +375,7 @@ namespace UE
 		};
 	};
 
+
 	template<typename ArrayType>
 	class TSparseArray
 	{
@@ -392,162 +389,185 @@ namespace UE
 		int32 NumFreeIndices;
 
 	public:
-		template<typename IteratedArrayType>
-		class TBaseIterator
-		{
 
-			TSparseArray<IteratedArrayType>& IteratedArray;
-			TBitArray BitArrayIt;
+		class FBaseIterator
+		{
+		private:
+			TSparseArray<ArrayType>& IteratedArray;
+			TBitArray::FBitIterator BitArrayIt;
 
 		public:
-			FORCEINLINE TBaseIterator(const TSparseArray<IteratedArrayType>& Array, const TBitArray& BitIterator)
-				: IteratedArray(Array), BitArrayIt(BitIterator)
+			FORCEINLINE FBaseIterator(const TSparseArray<ArrayType>& Array, const TBitArray::FBitIterator BitIterator)
+				: IteratedArray(const_cast<TSparseArray<ArrayType>&>(Array)), BitArrayIt(const_cast<TBitArray::FBitIterator&>(BitIterator))
 			{
 			}
 
-			FORCEINLINE TBaseIterator<IteratedArrayType>& operator++()
+			FORCEINLINE TSparseArray<ArrayType>::FBaseIterator& operator++()
 			{
-				while (true)
-				{
-					++BitArrayIt;
-
-					if (*BitArrayIt)
-						break;
-				}
+				++BitArrayIt;
 				return *this;
 			}
-			FORCEINLINE IteratedArrayType& operator*()
+			FORCEINLINE ArrayType& operator*()
 			{
 				return IteratedArray[BitArrayIt.GetIndex()].ElementData;
 			}
-			FORCEINLINE const IteratedArrayType& operator*() const
+			FORCEINLINE const ArrayType& operator*() const
 			{
 				return IteratedArray[BitArrayIt.GetIndex()].ElementData;
 			}
-			FORCEINLINE IteratedArrayType& operator->()
+			FORCEINLINE ArrayType& operator->()
 			{
 				return IteratedArray[BitArrayIt.GetIndex()].ElementData;
 			}
-			FORCEINLINE const IteratedArrayType& operator->() const
+			FORCEINLINE const ArrayType& operator->() const
 			{
 				return IteratedArray[BitArrayIt.GetIndex()].ElementData;
 			}
-			FORCEINLINE bool operator==(const TBaseIterator<IteratedArrayType>& Other) const
+			FORCEINLINE bool operator==(const TSparseArray<ArrayType>::FBaseIterator& Other) const
 			{
-				return BitArrayIt.GetIndex() == Other.BitArrayIt.GetIndex();
+				return BitArrayIt == Other.BitArrayIt;
 			}
-			FORCEINLINE bool operator!=(const TBaseIterator<IteratedArrayType>& Other) const
+			FORCEINLINE bool operator!=(const TSparseArray<ArrayType>::FBaseIterator& Other) const
 			{
-				return BitArrayIt.GetIndex() != Other.BitArrayIt.GetIndex();
+				return BitArrayIt != Other.BitArrayIt;
 			}
 		};
 
 	public:
-		FORCEINLINE TBaseIterator<ArrayType> begin()
+		FORCEINLINE TSparseArray<ArrayType>::FBaseIterator begin()
 		{
-			return TBaseIterator<ArrayType>(*this, TBitArray::FBitIterator(AllocationFlags, 0));
+			return TSparseArray<ArrayType>::FBaseIterator(*this, TBitArray::FBitIterator(AllocationFlags, 0));
 		}
-		FORCEINLINE const TBaseIterator<ArrayType> begin() const
+		FORCEINLINE const TSparseArray<ArrayType>::FBaseIterator begin() const
 		{
-			return TBaseIterator<ArrayType>(*this, TBitArray::FBitIterator(AllocationFlags, 0));
+			return TSparseArray<ArrayType>::FBaseIterator(*this, TBitArray::FBitIterator(AllocationFlags, 0));
 		}
-		FORCEINLINE TBaseIterator<ArrayType> end()
+		FORCEINLINE TSparseArray<ArrayType>::FBaseIterator end()
 		{
-			return TBaseIterator<ArrayType>(*this, TBitArray::FBitIterator(AllocationFlags));
+			return TSparseArray<ArrayType>::FBaseIterator(*this, TBitArray::FBitIterator(AllocationFlags));
 		}
-		FORCEINLINE const TBaseIterator<ArrayType> end() const
+		FORCEINLINE const TSparseArray<ArrayType>::FBaseIterator end() const
 		{
-			return TBaseIterator<ArrayType>(*this, TBitArray::FBitIterator(AllocationFlags));
+			return TSparseArray<ArrayType>::FBaseIterator(*this, TBitArray::FBitIterator(AllocationFlags));
 		}
 
 		FORCEINLINE FSparseArrayElement& operator[](uint32 Index)
 		{
-			return (FSparseArrayElement*)Data[Index];
+			return *(FSparseArrayElement*)&Data[Index].ElementData;
 		}
 		FORCEINLINE const FSparseArrayElement& operator[](uint32 Index) const
 		{
-			return (const FSparseArrayElement*)Data[Index];
+			return *(const FSparseArrayElement*)&Data[Index].ElementData;
 		}
 	};
 
+	template<typename ElementType>
+	class TSetElement
+	{
+	public:
+		ElementType Value;
+		mutable int32 HashNextId;
+		mutable int32 HashIndex;
+
+		FORCEINLINE bool operator==(const TSetElement& Other) const
+		{
+			return Value == Other.Value;
+		}
+		FORCEINLINE bool operator!=(const TSetElement& Other) const
+		{
+			return Value != Other.Value;
+		}
+	};
+	
 	template<typename SetType>
 	class TSet
 	{
-		TSparseArray<SetType> Elements;
+	public:
+		typedef TSetElement<SetType> ElementType;
+
+	private:
+		TSparseArray<ElementType> Elements;
 		
-		mutable TInlineAllocator<1>::ForElementType<int> Hash; //16
+		mutable TInlineAllocator<1>::ForElementType<int> Hash;
 		mutable int32 HashSize;
 
-		template<typename ItSetType>
-		class TBaseIterator
+	public:
+		class FBaseIterator
 		{
-			TSparseArray::TBaseIterator<ItSetType>& ElementIt;
+		private:
+			TSet<SetType>& IteratedSet;
+			TSparseArray<ElementType>::FBaseIterator ElementIt;
 
 		public:
-			FORCEINLINE TBaseIterator(TSparseArray::TBaseIterator<ItSetType>& InElementIt)
-				: ElementIt(InElementIt)
+			FORCEINLINE FBaseIterator(const TSet<SetType>& InSet, TSparseArray<TSetElement<SetType>>::FBaseIterator InElementIt)
+				: IteratedSet(const_cast<TSet<SetType>&>(InSet)), ElementIt(InElementIt)
 			{
 			}
 
-			FORCEINLINE TBaseIterator<ItSetType>& operator++()
+			FORCEINLINE TSet<SetType>::FBaseIterator& operator++()
 			{
-				return ElementIt++;
+				++ElementIt;
+				return *this;
 			}
-			FORCEINLINE bool operator==(const TBaseIterator<ItSetType>& OtherIt) const
+			FORCEINLINE bool operator==(const TSet<SetType>::FBaseIterator& OtherIt) const
 			{
 				return ElementIt == OtherIt.ElementIt;
 			}
-			FORCEINLINE bool operator!=(const TBaseIterator<ItSetType>& OtherIt) const
+			FORCEINLINE bool operator!=(const TSet<SetType>::FBaseIterator& OtherIt) const
 			{
 				return ElementIt != OtherIt.ElementIt;
 			}
-			FORCEINLINE TBaseIterator<ItSetType>& operator=(TBaseIterator<ItSetType>& OtherIt)
+			FORCEINLINE TSet<SetType>::FBaseIterator& operator=(TSet<SetType>::FBaseIterator& OtherIt)
 			{
 				return ElementIt = OtherIt.ElementIt;
 			}
-			FORCEINLINE ItSetType& operator*()
+			FORCEINLINE ElementType& operator*()
 			{
-				return *ElementIt;
+				return *(ElementType*)&*ElementIt;
 			}
-			FORCEINLINE const ItSetType& operator*() const
+			FORCEINLINE const ElementType& operator*() const
 			{
-				return *ElementIt;
+				return *(ElementType*)&*ElementIt;
 			}
-			FORCEINLINE ItSetType& operator->()
+			FORCEINLINE ElementType& operator->()
 			{
-				return *ElementIt;
+				return *(ElementType*)&*ElementIt;
 			}
-			FORCEINLINE const ItSetType& operator->() const
+			FORCEINLINE const ElementType& operator->() const
 			{
-				return *ElementIt;
+				return *(ElementType*)&*ElementIt;
 			}
 		};
 
 	public:
-		FORCEINLINE TBaseIterator<SetType> begin()
+		FORCEINLINE TSet<SetType>::FBaseIterator begin()
 		{
-			return TBaseIterator<SetType>(Elements.begin());
+			return TSet<SetType>::FBaseIterator(*this, Elements.begin());
 		}
-		FORCEINLINE const TBaseIterator<SetType> begin() const
+		FORCEINLINE const TSet<SetType>::FBaseIterator begin() const
 		{
-			return TBaseIterator<SetType>(Elements.begin());
+			return TSet<SetType>::FBaseIterator(*this, Elements.begin());
 		}
-		FORCEINLINE TBaseIterator<SetType> end()
+		FORCEINLINE TSet<SetType>::FBaseIterator end()
 		{
-			return TBaseIterator<SetType>(Elements.end());
+			return TSet<SetType>::FBaseIterator(*this, Elements.end());
 		}
-		FORCEINLINE const TBaseIterator<SetType> end() const
+		FORCEINLINE const TSet<SetType>::FBaseIterator end() const
 		{
-			return TBaseIterator<SetType>(Elements.end());
+			return TSet<SetType>::FBaseIterator(*this, Elements.end());
 		}
 	};
-
 	template<typename KeyType, typename ValueType>
 	class TPair
 	{
 	private:
 		KeyType First;
 		ValueType Second;
+
+		TPair(KeyType& Key, ValueType& Value)
+			: First(Key), Second(Value)
+		{
+		}
 
 	public:
 
@@ -579,52 +599,56 @@ namespace UE
 		TSet<ElementType> Pairs;
 
 	public:
-		template<typename ItMapType>
-		class TBaseIterator
+		class FBaseIterator
 		{
-			TMap<KeyType, ValueType>& ItMap;
-			TSet::TBaseIterator<ItMapType> SetIt;
+		private:
+			TMap<KeyType, ValueType>& IteratedMap;
+			TSet<ElementType>::FBaseIterator SetIt;
 
-			TBaseIterator(TMap<KeyType, ValueType>& Map, TSet<ItMapType>& Set)
-				: ItMap(Map), SetIt(Set)
+		public:
+			FBaseIterator(TMap<KeyType, ValueType>& InMap, TSet<ElementType>::FBaseIterator InSet)
+				: IteratedMap(InMap), SetIt(InSet)
 			{
 			}
-
-			FORCEINLINE ItMapType& operator*()
+			FORCEINLINE TMap<KeyType, ValueType>::FBaseIterator operator++()
+			{
+				++SetIt;
+				return *this;
+			}
+			FORCEINLINE TSet<ElementType>::ElementType& operator*()
 			{
 				return *SetIt;
 			}
-			FORCEINLINE const ItMapType& operator*() const
+			FORCEINLINE const TSet<ElementType>::ElementType& operator*() const
 			{
 				return *SetIt;
 			}
-			FORCEINLINE bool operator==(const TBaseIterator<ItMapType>& Other) const
+			FORCEINLINE bool operator==(const TMap<KeyType, ValueType>::FBaseIterator& Other) const
 			{
 				return SetIt == Other.SetIt;
 			}
-			FORCEINLINE bool operator!=(const TBaseIterator<ItMapType>& Other) const
+			FORCEINLINE bool operator!=(const TMap<KeyType, ValueType>::FBaseIterator& Other) const
 			{
 				return SetIt != Other.SetIt;
 			}
 		};
 
-		FORCEINLINE TBaseIterator<ElementType> begin()
+		FORCEINLINE TMap<KeyType, ValueType>::FBaseIterator begin()
 		{
-			return TBaseIterator<ElementType>(*this, Pairs.begin());
+			return TMap<KeyType, ValueType>::FBaseIterator(*this, Pairs.begin());
 		}
-		FORCEINLINE const TBaseIterator<ElementType> begin() const
+		FORCEINLINE const TMap<KeyType, ValueType>::FBaseIterator begin() const
 		{
-			return TBaseIterator<ElementType>(*this, Pairs.begin());
+			return TMap<KeyType, ValueType>::FBaseIterator(*this, Pairs.begin());
 		}
-		FORCEINLINE TBaseIterator<ElementType> end()
+		FORCEINLINE TMap<KeyType, ValueType>::FBaseIterator end()
 		{
-			return TBaseIterator<ElementType>(*this, Pairs.end());
+			return TMap<KeyType, ValueType>::FBaseIterator(*this, Pairs.end());
 		}
-		FORCEINLINE const TBaseIterator<ElementType> end() const
+		FORCEINLINE const TMap<KeyType, ValueType>::FBaseIterator end() const
 		{
-			return TBaseIterator<ElementType>(*this, Pairs.end());
+			return TMap<KeyType, ValueType>::FBaseIterator(*this, Pairs.end());
 		}
-
 		FORCEINLINE ElementType& operator[](const KeyType& Key)
 		{
 			return this->GetByKey(Key);
