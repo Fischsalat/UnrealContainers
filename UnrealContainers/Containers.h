@@ -2,6 +2,11 @@
 
 namespace UE
 {
+	// FMemory::Realloc: Allows for reallocation of TArray data, used to expand TArrays
+	// FMemory::Free: Allows to free TArrays and FStrings allocated by the engine (eg. FName::ToString)
+
+	// Why not just use standard C free and realloc? You can't play with heap memory allocated by another program, it'll crash
+
 	typedef __int8 int8;
 	typedef __int16 int16;
 	typedef __int32 int32;
@@ -12,6 +17,10 @@ namespace UE
 	typedef unsigned __int32 uint32;
 	typedef unsigned __int64 uint64;
 
+	/* Add a pattern or offset here (reason above) */
+	static auto Realloc = reinterpret_cast<void* (*)(void* Memory, int64 NewSize, uint32 Alignment)>(uintptr_t(GetModuleHandle(0)) + 0x10B7900);
+	static auto Free = reinterpret_cast<void(*)(void* Memory)>(uintptr_t(GetModuleHandle(0)) + 0x10AC0F0);
+
 
 	template<class ElementType>
 	class TArray
@@ -20,23 +29,23 @@ namespace UE
 
 
 	public:
-		inline int Num() const
+		FORCEINLINE int Num() const
 		{
 			return Count;
 		}
-		inline int Max() const
+		FORCEINLINE int Max() const
 		{
 			return MaxElements;
 		}
-		inline int Slack() const
+		FORCEINLINE int Slack() const
 		{
 			return MaxElements - Count;
 		}
-		inline void Reserve(const int NumElements)
+		FORCEINLINE void Reserve(const int NumElements)
 		{
 			Data = Slack() >= NumElements ? Data : (ElementType*)Realloc(Data, (MaxElements = Count + NumElements) * sizeof(ElementType), 0);
 		}
-		inline void Reset(int MinSizeAfterReset = 0)
+		FORCEINLINE void Reset(int MinSizeAfterReset = 0)
 		{
 			if (MaxElements >= MinSizeAfterReset)
 			{
@@ -44,30 +53,37 @@ namespace UE
 
 			}
 		}
-		inline void RemoveAt(const int Index, const int Lenght)
+		FORCEINLINE void RemoveAt(const int Index, const int Lenght)
 		{
 
 		}
-		void Add(ElementType InputData...)
+		FORCEINLINE void Add(ElementType InData...)
 		{
-			int Num = sizeof(InputData) / sizeof(ElementType);
+			int Num = sizeof(InData) / sizeof(ElementType);
 
 			Reserve(Num);
-			Data[Count] = InputData;
+			Data[Count] = InData;
 			Count += Num;
 		};
+		FORCEINLINE void FreeArray()
+		{
+			Free(Data);
+			Data = nullptr;
+			Count = 0;
+			MaxElements = 0;
+		}
 
-		inline ElementType& operator[](int i)
+		FORCEINLINE ElementType& operator[](int i)
 		{
 			return Data[i];
 		};
 
-		inline const ElementType& operator[](int i) const
+		FORCEINLINE const ElementType& operator[](int i) const
 		{
 			return Data[i];
 		};
 
-		inline int MaxIndex()
+		FORCEINLINE int MaxIndex()
 		{
 			return Count - 1;
 		}
@@ -110,19 +126,19 @@ namespace UE
 			}
 		};
 
-		inline FBaseArrayIterator begin()
+		FORCEINLINE FBaseArrayIterator begin()
 		{
 			return FBaseArrayIterator(*this, 0);
 		}
-		inline FBaseArrayIterator begin() const
+		FORCEINLINE FBaseArrayIterator begin() const
 		{
 			return FBaseArrayIterator(*this, 0);
 		}
-		inline FBaseArrayIterator end()
+		FORCEINLINE FBaseArrayIterator end()
 		{
 			return FBaseArrayIterator(*this);
 		}
-		inline FBaseArrayIterator end() const
+		FORCEINLINE FBaseArrayIterator end() const
 		{
 			return FBaseArrayIterator(*this);
 		}
@@ -149,34 +165,29 @@ namespace UE
 			}
 		};
 
-		inline bool IsValid() const
+		FORCEINLINE bool IsValid() const
 		{
 			return Data != nullptr;
 		}
 
-		const wchar_t* ToWString() const
+		FORCEINLINE const wchar_t* ToWString() const
 		{
 			return Data;
 		}
-
-		std::string ToString() const
+		FORCEINLINE void Free()
 		{
-			auto length = std::wcslen(Data);
+			this->FreeArray();
+		}
+
+		FORCEINLINE std::string ToString() const
+		{
+			auto length = wcslen(Data);
 
 			std::string str(length, '\0');
 
 			std::use_facet<std::ctype<wchar_t>>(std::locale()).narrow(Data, Data + length, '?', &str[0]);
 
 			return str;
-		}
-		inline void Free()
-		{
-			static auto FreeInternal = reinterpret_cast<void(*)(void*)>(uintptr_t(GetModuleHandle(0)) + 0x10AC0F0);
-
-			FreeInternal(Data);
-			Data = nullptr;
-			Count = 0;
-			MaxElements = 0;
 		}
 	};
 
@@ -246,12 +257,11 @@ namespace UE
 		{
 		public:
 			FORCEINLINE explicit FRelativeBitReference(int32 BitIndex)
-				: DWORDIndex(BitIndex >> ((int32)5))
-				, Mask(1 << (BitIndex & (((int32)32) - 1)))
+				: DWORDIndex(BitIndex >> ((int32)5)), Mask(1 << (BitIndex & (((int32)32) - 1)))
 			{
 			}
 
-			int32 DWORDIndex;
+			int32  DWORDIndex;
 			uint32 Mask;
 		};
 	public:
@@ -266,9 +276,23 @@ namespace UE
 			{
 			}
 
+			FORCEINLINE void SetBit(const bool Value)
+			{
+				Value ? Data |= Mask : Data &= ~Mask;
+
+				// 10011101 - Data			 // 10011101 - Data
+				// 00000010 - Mask - true |	 // 00000010 - Mask - false
+				// 10011111	-  |=			 // 11111101 -  ~
+				//							 // 10011111 -  &=
+			}
+
 			FORCEINLINE operator bool() const
 			{
 				return (Data & Mask) != 0;
+			}
+			FORCEINLINE void operator=(const bool Value)
+			{
+				this->SetBit(Value);
 			}
 
 		private:
@@ -328,6 +352,11 @@ namespace UE
 		};
 
 	public:
+		FORCEINLINE FBitIterator Iterator(int32 StartIndex)
+		{
+			return FBitIterator(*this, StartIndex);
+		}
+
 		FORCEINLINE FBitIterator begin()
 		{
 			return FBitIterator(*this, 0);
@@ -357,11 +386,30 @@ namespace UE
 		{
 			return *FBitIterator(*this, Index);
 		}
+		FORCEINLINE void Set(const int32 Index, const bool Value)
+		{
+			const int32 DWORDIndex = (Index >> ((int32)5));
+			const int32 Mask = (1 << (Index & (((int32)32) - 1)));
+
+			NumBits = Index >= NumBits ? Index < MaxBits ? Index + 1 : NumBits : NumBits;
+
+			FBitReference(Data[DWORDIndex], Mask).SetBit(Value);
+		}
 	};
 
 	template<typename ElementType>
 	union TSparseArrayElementOrListLink
 	{
+		TSparseArrayElementOrListLink(ElementType InElement)
+			: ElementData(InElement)
+		{
+		}
+
+		TSparseArrayElementOrListLink(int32 InPrevFree, int32 InNextFree)
+			: PrevFreeIndex(InPrevFree), NextFreeIndex(InNextFree)
+		{
+		}
+
 		/** If the element is allocated, its value is stored here. */
 		ElementType ElementData;
 
@@ -459,6 +507,79 @@ namespace UE
 		{
 			return *(const FSparseArrayElement*)&Data[Index].ElementData;
 		}
+
+		FORCEINLINE int32 GetNumFreeIndices() const
+		{
+			return NumFreeIndices;
+		}
+		FORCEINLINE int32 GetFirstFreeIndex() const
+		{
+			return FirstFreeIndex;
+		}
+		FORCEINLINE TBitArray& GetAllocationFlags()
+		{
+			return AllocationFlags;
+		}
+		FORCEINLINE const TBitArray& GetAllocationFlags() const 
+		{
+			return AllocationFlags;
+		}
+		FORCEINLINE TArray<FSparseArrayElement>& GetData()
+		{
+			return Data;
+		}
+		FORCEINLINE const TArray<FSparseArrayElement>& GetData() const
+		{
+			return Data;
+		}
+		FORCEINLINE int32 AddSingle(ArrayType InElement)
+		{
+			FSparseArrayElement Element(InElement);
+
+			int32 NextFree;
+			int32 OutIndex;
+			if (FirstFreeIndex >= 1)
+			{
+				NextFree = Data[FirstFreeIndex].NextFreeIndex;
+				Data[FirstFreeIndex] = Element;
+				--NumFreeIndices;
+
+				AllocationFlags.Set(FirstFreeIndex, true);
+
+				if (NumFreeIndices >= 1)
+				{
+					OutIndex = NextFree;
+					FirstFreeIndex = NextFree;
+					Data[NextFree].PrevFreeIndex = -1;
+
+					return OutIndex;
+				}
+			}
+			else
+			{
+				Data.Add(Element);
+				AllocationFlags.Set(Data.Num() - 1, true);
+
+				return Data.Num() - 1;
+			}
+		}
+		/*
+		FORCEINLINE void Add(ArrayType... Elements)
+		{
+			va_list myList;
+
+			va_start(myList, Elements);
+
+			const int32 Num = sizeof(Elements) / sizeof(ArrayType);
+
+			for (int i = 0; i < Num; ++i)
+			{
+			//	this->AddSinge(va_arg(myList, Elements));
+			}
+
+			va_end(myList);
+		}
+		*/
 	};
 
 	template<typename ElementType>
@@ -468,6 +589,11 @@ namespace UE
 		ElementType Value;
 		mutable int32 HashNextId;
 		mutable int32 HashIndex;
+
+		TSetElement(ElementType InValue, int32 InHashNextId, int32 InHashIndex)
+			: Value(InValue), HashNextId(InHashNextId), HashIndex(InHashIndex)
+		{
+		}
 
 		FORCEINLINE bool operator==(const TSetElement& Other) const
 		{
@@ -556,6 +682,24 @@ namespace UE
 		{
 			return TSet<SetType>::FBaseIterator(*this, Elements.end());
 		}
+
+		FORCEINLINE TSparseArray<ElementType>& GetElements()
+		{
+			return Elements;
+		}
+		FORCEINLINE const TSparseArray<ElementType>& GetElements() const
+		{
+			return Elements;
+		}
+
+		FORCEINLINE int32 AddSingle(SetType InElement, int32 InHashIndex = 0, int32 InHashNextId = 0)
+		{
+			//ToDo: Check for duplication
+
+			ElementType Element(InElement, InHashIndex, InHashNextId);
+
+			return Elements.AddSingle(Element);
+		}
 	};
 	template<typename KeyType, typename ValueType>
 	class TPair
@@ -564,7 +708,8 @@ namespace UE
 		KeyType First;
 		ValueType Second;
 
-		TPair(KeyType& Key, ValueType& Value)
+	public:
+		TPair(KeyType Key, ValueType Value)
 			: First(Key), Second(Value)
 		{
 		}
@@ -658,6 +803,15 @@ namespace UE
 			return this->GetByKey(Key);
 		}
 
+		FORCEINLINE int32 AddSingle(KeyType InKey, ValueType InValue)
+		{
+			return Pairs.AddSingle({ InKey, InValue });
+		}
+		FORCEINLINE int32 AddSingle(ElementType InElement)
+		{
+			return Pairs.AddSingle(InElement);
+		}
+
 		template<typename ComparisonFunction>
 		FORCEINLINE ElementType& GetByKey(const KeyType& Key, ComparisonFunction* comp = nullptr)
 		{
@@ -668,6 +822,7 @@ namespace UE
 					return Pair;
 				}
 			}
+			return nullptr;
 		}
 
 	};

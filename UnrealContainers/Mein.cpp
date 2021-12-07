@@ -39,9 +39,8 @@ void Main()
         {
             std::cout << current << "\n";
 
-            TSparseArray<TPair<int32, int32>>& myArray = *(TSparseArray<TPair<int32, int32>>*)((uint8*)current + 0x138);
-            TSet<TPair<int32, int32>>& mySet = *(TSet<TPair<int32, int32>>*)((uint8*)current + 0x138);
-            TMap<int32, int32>& myMap = *(TMap<int32, int32>*)((uint8*)current + 0x138);
+            TSet<TPair<int8, int32>>& mySet = *(TSet<TPair<int8, int32>>*)((uint8*)current + 0x138);
+            TMap<int8, int32>& myMap = *(TMap<int8, int32>*)((uint8*)current + 0x138);
             TBitArray& myBits = *(TBitArray*)((uint8*)current + 0x148);
 
             std::cout << "\n";
@@ -54,24 +53,45 @@ void Main()
                 std::cout << (element ? "True\n" : "False\n");
             }
 
-            std::cout << "\nTSparseArray:\n";
-            for (auto element : myArray)
+            std::cout << "\nTBitAray:\n";
+            for (auto element : myBits)
             {
-                std::cout << element.Key() << "\t" << element.Value() << "\n";
+                std::cout << (element ? "True\n" : "False\n");
             }
 
             std::cout << "\nTSet:\n";
             for (auto element : mySet)
             {
-                std::cout << element.Value.Key() << "\t" << element.Value.Value() << "\n";
+                std::cout << +element.Value.Key() << "\t" << element.Value.Value() << "\t" << element.HashIndex << "\t" << element.HashNextId << "\n";
             }
 
             std::cout << "\nTMap:\n";
             for (auto element : myMap)
             {
-                std::cout << element.Value.Key() << "\t" << element.Value.Value() << "\n";
+                std::cout << +element.Value.Key() << "\t" << element.Value.Value() << "\n";
             }
 
+            myMap.AddSingle(int8(8), int32(500));
+
+            std::cout << "\nFirstFreeIndex: " << mySet.GetElements().GetFirstFreeIndex() << "\n";
+            std::cout << "\nFirstFreeIndex. " << mySet.GetElements().GetNumFreeIndices() << "\n";
+
+            std::cout << "\nArray Count: " << mySet.GetElements().GetData().Num() << "\n";
+            std::cout << "\nArray Max: " << mySet.GetElements().GetData().Max() << "\n";
+
+            std::cout << "\nNumBits: " << mySet.GetElements().GetAllocationFlags().Num() << "\n";
+            std::cout << "\nMaxBits: " << mySet.GetElements().GetAllocationFlags().Max() << "\n";
+           
+            for (auto boll : myBits)
+            {
+                std::cout << (boll ? "true\n" : "false\n");
+            }
+
+            std::cout << "\nTMap:\n";
+            for (auto element : myMap)
+            {
+                std::cout << +element.Value.Key() << "\t" << element.Value.Value() << "\n";
+            }
         }
     }
 
