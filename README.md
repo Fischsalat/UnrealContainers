@@ -1,4 +1,8 @@
 # UnrealContainers
-Some UE4 container types with iterators. 
+Some UE4 container types with iterators.
 
-SOME ARE NOT WORKING YET!
+Types:
+  TBitArray
+  TSparseArray
+  TSet
+  TMap
