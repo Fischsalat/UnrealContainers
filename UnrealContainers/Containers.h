@@ -2,7 +2,8 @@
 
 namespace UE
 {
-	// FMemory::Realloc: Allows for reallocation of TArray data, used to expand TArrays
+	// FMemory::Malloc: Allows for initialization of TSets and TMaps that aren't already initialized
+	// FMemory::Realloc: Allows for reallocation of Container data, used to expand TArrays and TMaps
 	// FMemory::Free: Allows to free TArrays and FStrings allocated by the engine (eg. FName::ToString)
 
 	// Why not just use standard C free and realloc? You can't play with heap memory allocated by another program, it'll crash
@@ -18,15 +19,17 @@ namespace UE
 	typedef unsigned __int64 uint64;
 
 	/* Add a pattern or offset here (reason above) */
+	static auto Malloc = reinterpret_cast<void* (*)(int32 Size, int32 Alignment)>(uintptr_t(GetModuleHandle(0)) + 0x10B54D0);
 	static auto Realloc = reinterpret_cast<void* (*)(void* Memory, int64 NewSize, uint32 Alignment)>(uintptr_t(GetModuleHandle(0)) + 0x10B7900);
-	static auto Free = reinterpret_cast<void(*)(void* Memory)>(uintptr_t(GetModuleHandle(0)) + 0x10AC0F0);
+	static auto Free = reinterpret_cast<void (*)(void* Memory)>(uintptr_t(GetModuleHandle(0)) + 0x10AC0F0);
 
 
-	template<class ElementType>
+	template<class TArrayType>
 	class TArray
 	{
-		friend struct FString;
-
+		friend class FString;
+		template<typename ArrayType> friend class TSparseArray;
+		template<typename SetType>   friend class TSet;
 
 	public:
 		FORCEINLINE int Num() const
@@ -43,7 +46,7 @@ namespace UE
 		}
 		FORCEINLINE void Reserve(const int NumElements)
 		{
-			Data = Slack() >= NumElements ? Data : (ElementType*)Realloc(Data, (MaxElements = Count + NumElements) * sizeof(ElementType), 0);
+			Data = Slack() >= NumElements ? Data : (TArrayType*)Realloc(Data, (MaxElements = Count + NumElements) * sizeof(TArrayType), 0);
 		}
 		FORCEINLINE void Reset(int MinSizeAfterReset = 0)
 		{
@@ -55,11 +58,11 @@ namespace UE
 		}
 		FORCEINLINE void RemoveAt(const int Index, const int Lenght)
 		{
-
+			
 		}
-		FORCEINLINE void Add(ElementType InData...)
+		FORCEINLINE void Add(TArrayType InData...)
 		{
-			int Num = sizeof(InData) / sizeof(ElementType);
+			int Num = sizeof(InData) / sizeof(TArrayType);
 
 			Reserve(Num);
 			Data[Count] = InData;
@@ -73,12 +76,12 @@ namespace UE
 			MaxElements = 0;
 		}
 
-		FORCEINLINE ElementType& operator[](int i)
+		FORCEINLINE TArrayType& operator[](int i)
 		{
 			return Data[i];
 		};
 
-		FORCEINLINE const ElementType& operator[](int i) const
+		FORCEINLINE const TArrayType& operator[](int i) const
 		{
 			return Data[i];
 		};
@@ -91,23 +94,23 @@ namespace UE
 		class FBaseArrayIterator
 		{
 			int32 Index;
-			TArray<ElementType>& ItArray;
+			TArray<TArrayType>& ItArray;
 
 		public:
-			FBaseArrayIterator(TArray<ElementType>& Array)
+			FBaseArrayIterator(TArray<TArrayType>& Array)
 				: ItArray(Array), Index(Array.max)
 			{
 			}
-			FBaseArrayIterator(TArray<ElementType>& Array, int32 CurrentIndex)
+			FBaseArrayIterator(TArray<TArrayType>& Array, int32 CurrentIndex)
 				: ItArray(Array), Index(CurrentIndex)
 			{
 			}
 
-			FORCEINLINE ElementType& operator*()
+			FORCEINLINE TArrayType& operator*()
 			{
 				return ItArray[Index];
 			}
-			FORCEINLINE ElementType& operator->()
+			FORCEINLINE TArrayType& operator->()
 			{
 				return ItArray[Index];
 			}
@@ -144,7 +147,7 @@ namespace UE
 		}
 
 	private:
-		ElementType* Data;
+		TArrayType* Data;
 		int32_t Count;
 		int32_t MaxElements;
 	};
@@ -226,6 +229,11 @@ namespace UE
 				return *(ElementType*)(&InlineData[Index]);
 			}
 
+			FORCEINLINE void operator=(void* InElements)
+			{
+				SecondaryData = InElements;
+			}
+
 			FORCEINLINE ElementType& GetInlinElement(int32 Index)
 			{
 				return *(ElementType*)(&InlineData[Index]);
@@ -247,6 +255,9 @@ namespace UE
 
 	class TBitArray
 	{
+	private:
+		template<typename ArrayType> friend class TSparseArray;
+		template<typename SetType>   friend class TSet;
 
 	private:
 		TInlineAllocator<4>::ForElementType<uint32> Data;
@@ -386,21 +397,33 @@ namespace UE
 		{
 			return *FBitIterator(*this, Index);
 		}
-		FORCEINLINE void Set(const int32 Index, const bool Value)
+		FORCEINLINE void Set(const int32 Index, const bool Value, bool bIsSettingAllZero = false)
 		{
 			const int32 DWORDIndex = (Index >> ((int32)5));
 			const int32 Mask = (1 << (Index & (((int32)32) - 1)));
 
+			if(!bIsSettingAllZero)
 			NumBits = Index >= NumBits ? Index < MaxBits ? Index + 1 : NumBits : NumBits;
 
 			FBitReference(Data[DWORDIndex], Mask).SetBit(Value);
+		}
+		FORCEINLINE void ZeroAll()
+		{
+			for (int i = 0; i < MaxBits; i++)
+			{
+				Set(i, false, true);
+			}
 		}
 	};
 
 	template<typename ElementType>
 	union TSparseArrayElementOrListLink
 	{
-		TSparseArrayElementOrListLink(ElementType InElement)
+		TSparseArrayElementOrListLink(ElementType& InElement)
+			: ElementData(InElement)
+		{
+		}
+		TSparseArrayElementOrListLink(ElementType&& InElement)
 			: ElementData(InElement)
 		{
 		}
@@ -408,6 +431,11 @@ namespace UE
 		TSparseArrayElementOrListLink(int32 InPrevFree, int32 InNextFree)
 			: PrevFreeIndex(InPrevFree), NextFreeIndex(InNextFree)
 		{
+		}
+
+		TSparseArrayElementOrListLink<ElementType> operator=(const TSparseArrayElementOrListLink<ElementType>& Other)
+		{
+			return TSparseArrayElementOrListLink(Other.NextFreeIndex, Other.PrevFreeIndex);
 		}
 
 		/** If the element is allocated, its value is stored here. */
@@ -427,6 +455,9 @@ namespace UE
 	template<typename ArrayType>
 	class TSparseArray
 	{
+	private:
+		template<typename SetType> friend class TSet;
+
 	public:
 		typedef TSparseArrayElementOrListLink<ArrayType> FSparseArrayElement;
 
@@ -516,21 +547,13 @@ namespace UE
 		{
 			return FirstFreeIndex;
 		}
-		FORCEINLINE TBitArray& GetAllocationFlags()
-		{
-			return AllocationFlags;
-		}
-		FORCEINLINE const TBitArray& GetAllocationFlags() const 
-		{
-			return AllocationFlags;
-		}
-		FORCEINLINE TArray<FSparseArrayElement>& GetData()
-		{
-			return Data;
-		}
 		FORCEINLINE const TArray<FSparseArrayElement>& GetData() const
 		{
 			return Data;
+		}
+		FORCEINLINE const TBitArray& GetAllocationFlags() const
+		{
+			return AllocationFlags;
 		}
 		FORCEINLINE int32 AddSingle(ArrayType InElement)
 		{
@@ -595,6 +618,12 @@ namespace UE
 		{
 		}
 
+		FORCEINLINE TSetElement<ElementType>& operator=(const TSetElement<ElementType>& Other)
+		{
+			Value = Other.Value;
+
+		}
+
 		FORCEINLINE bool operator==(const TSetElement& Other) const
 		{
 			return Value == Other.Value;
@@ -608,8 +637,12 @@ namespace UE
 	template<typename SetType>
 	class TSet
 	{
+	private:
+		friend TSparseArray;
+
 	public:
 		typedef TSetElement<SetType> ElementType;
+		typedef TSparseArrayElementOrListLink<ElementType> ArrayElementType;
 
 	private:
 		TSparseArray<ElementType> Elements;
@@ -683,6 +716,10 @@ namespace UE
 			return TSet<SetType>::FBaseIterator(*this, Elements.end());
 		}
 
+		FORCEINLINE bool IsValid() const
+		{
+			return Elements.Data.Data != nullptr && Elements.AllocationFlags.MaxBits > 0;
+		}
 		FORCEINLINE TSparseArray<ElementType>& GetElements()
 		{
 			return Elements;
@@ -699,6 +736,30 @@ namespace UE
 			ElementType Element(InElement, InHashIndex, InHashNextId);
 
 			return Elements.AddSingle(Element);
+		}
+		FORCEINLINE void Initialize(const int32 NumElementsToInitWith = 5)
+		{
+			if (this->IsValid())
+				return;
+
+			Elements.Data.MaxElements = NumElementsToInitWith;
+			Elements.Data.Count = NumElementsToInitWith;
+			Elements.Data.Data = (ArrayElementType*)(Malloc(NumElementsToInitWith * sizeof(ElementType), alignof(ElementType)));
+			for (int i = 0; i < NumElementsToInitWith; i++)
+			{
+				Elements.Data.Data[i].PrevFreeIndex = i - 1;
+				Elements.Data.Data[i].NextFreeIndex = i + 1;
+			}
+
+			Elements.FirstFreeIndex = 0;
+			Elements.NumFreeIndices = NumElementsToInitWith;
+
+			Elements.AllocationFlags.MaxBits = 128;
+			Elements.AllocationFlags.NumBits = NumElementsToInitWith;
+			Elements.AllocationFlags.ZeroAll();
+
+			Hash = Malloc(NumElementsToInitWith * sizeof(ElementType), alignof(ElementType));
+			HashSize = sizeof(ElementType);
 		}
 	};
 	template<typename KeyType, typename ValueType>
@@ -823,6 +884,15 @@ namespace UE
 				}
 			}
 			return nullptr;
+		}
+
+		FORCEINLINE bool IsValid() const
+		{
+			return Pairs.IsValid();
+		}
+		FORCEINLINE void Initialize(const int32 NumElementsToInitWith = 5)
+		{
+			return Pairs.Initialize(NumElementsToInitWith);
 		}
 
 	};

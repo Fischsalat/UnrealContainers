@@ -15,7 +15,10 @@ void GetSize()
     //std::cout << sizeof(TSet<int>) << "\n";         // 80 / 80 Not Tested
     //std::cout << sizeof(TMap<int, float>) << "\n";  // 80 / 80 Not Tested
 }
-
+struct FText
+{
+    uint8 pad[0x18];
+};
 
 void Main()
 {
@@ -35,63 +38,19 @@ void Main()
             continue;
 
 
-        if (current->GetFullName() == "FortUIDataConfiguration FortniteUI.Default__FortUIDataConfiguration")
+        if (current->GetFullName() == "UserDefinedEnum Engine.Default__UserDefinedEnum")
         {
             std::cout << current << "\n";
 
-            TSet<TPair<int8, int32>>& mySet = *(TSet<TPair<int8, int32>>*)((uint8*)current + 0x138);
-            TMap<int8, int32>& myMap = *(TMap<int8, int32>*)((uint8*)current + 0x138);
-            TBitArray& myBits = *(TBitArray*)((uint8*)current + 0x148);
+            TSet<TPair<FName, FText>>& mySet = *(TSet<TPair<FName, FText>>*)((uint8*)current + 0x60);
+            TMap<FName, FText>& myMap = *(TMap<FName, FText>*)((uint8*)current + 0x60);
+            TBitArray& myBits = *(TBitArray*)((uint8*)current + 0x70);
 
-            std::cout << "\n";
-            
-            int unfunnytestint = 0;
+            std::cout << "myMap.IsValid(): " << (myMap.IsValid() ? "true\n" : "false\n");
 
-            std::cout << "\nTBitAray:\n";
-            for (auto element : myBits)
-            {
-                std::cout << (element ? "True\n" : "False\n");
-            }
+            myMap.Initialize();
 
-            std::cout << "\nTBitAray:\n";
-            for (auto element : myBits)
-            {
-                std::cout << (element ? "True\n" : "False\n");
-            }
-
-            std::cout << "\nTSet:\n";
-            for (auto element : mySet)
-            {
-                std::cout << +element.Value.Key() << "\t" << element.Value.Value() << "\t" << element.HashIndex << "\t" << element.HashNextId << "\n";
-            }
-
-            std::cout << "\nTMap:\n";
-            for (auto element : myMap)
-            {
-                std::cout << +element.Value.Key() << "\t" << element.Value.Value() << "\n";
-            }
-
-            myMap.AddSingle(int8(8), int32(500));
-
-            std::cout << "\nFirstFreeIndex: " << mySet.GetElements().GetFirstFreeIndex() << "\n";
-            std::cout << "\nFirstFreeIndex. " << mySet.GetElements().GetNumFreeIndices() << "\n";
-
-            std::cout << "\nArray Count: " << mySet.GetElements().GetData().Num() << "\n";
-            std::cout << "\nArray Max: " << mySet.GetElements().GetData().Max() << "\n";
-
-            std::cout << "\nNumBits: " << mySet.GetElements().GetAllocationFlags().Num() << "\n";
-            std::cout << "\nMaxBits: " << mySet.GetElements().GetAllocationFlags().Max() << "\n";
-           
-            for (auto boll : myBits)
-            {
-                std::cout << (boll ? "true\n" : "false\n");
-            }
-
-            std::cout << "\nTMap:\n";
-            for (auto element : myMap)
-            {
-                std::cout << +element.Value.Key() << "\t" << element.Value.Value() << "\n";
-            }
+            std::cout << "myMap.IsValid(): " << (myMap.IsValid() ? "true\n" : "false\n");
         }
     }
 
