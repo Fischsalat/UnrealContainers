@@ -403,7 +403,7 @@ namespace UE
 			const int32 Mask = (1 << (Index & (((int32)32) - 1)));
 
 			if(!bIsSettingAllZero)
-			NumBits = Index >= NumBits ? Index < MaxBits ? Index + 1 : NumBits : NumBits;
+				NumBits = Index >= NumBits ? Index < MaxBits ? Index + 1 : NumBits : NumBits;
 
 			FBitReference(Data[DWORDIndex], Mask).SetBit(Value);
 		}
@@ -733,9 +733,10 @@ namespace UE
 		{
 			//ToDo: Check for duplication
 
-			ElementType Element(InElement, InHashIndex, InHashNextId);
+			if (!this->IsValid())
+				return this->Initialize();
 
-			return Elements.AddSingle(Element);
+			return Elements.AddSingle({ InElement, InHashIndex, InHashNextId });
 		}
 		FORCEINLINE void Initialize(const int32 NumElementsToInitWith = 5)
 		{
@@ -759,7 +760,7 @@ namespace UE
 			Elements.AllocationFlags.ZeroAll();
 
 			Hash = Malloc(NumElementsToInitWith * sizeof(ElementType), alignof(ElementType));
-			HashSize = sizeof(ElementType);
+			HashSize = NumElementsToInitWith * sizeof(ElementType);
 		}
 	};
 	template<typename KeyType, typename ValueType>
@@ -903,8 +904,8 @@ namespace UE
 	public:
 		ObjectType* Object;
 
-		int32_t SharedReferenceCount;
-		int32_t WeakReferenceCount;
+		int32 SharedReferenceCount;
+		int32 WeakReferenceCount;
 	};
 
 	template<class ObjectType>
@@ -913,8 +914,8 @@ namespace UE
 	private:
 		struct Counts
 		{
-			int32_t SharedReferenceCount;
-			int32_t WeakReferenceCount;
+			int32 SharedReferenceCount;
+			int32 WeakReferenceCount;
 		};
 
 	public:

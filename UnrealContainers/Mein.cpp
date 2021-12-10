@@ -45,7 +45,7 @@ void Main()
             TSet<TPair<FName, FText>>& mySet = *(TSet<TPair<FName, FText>>*)((uint8*)current + 0x60);
             TMap<FName, FText>& myMap = *(TMap<FName, FText>*)((uint8*)current + 0x60);
             TBitArray& myBits = *(TBitArray*)((uint8*)current + 0x70);
-
+            
             std::cout << "myMap.IsValid(): " << (myMap.IsValid() ? "true\n" : "false\n");
 
             myMap.Initialize();
