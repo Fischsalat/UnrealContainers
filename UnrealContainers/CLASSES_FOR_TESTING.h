@@ -12,6 +12,18 @@ class FName
 public:
 	int32 comparisonIndex;
 	int32 number;
+	inline FString ToFString() const
+	{
+		if (!this)
+			return L"";
+
+		static auto ToStr2 = reinterpret_cast<void(*)(const FName*, FString&)>(uintptr_t(GetModuleHandle(0)) + 0x117C420);
+
+		FString outStr;
+		ToStr2(this, outStr);
+
+		return outStr;
+	}
 
 	inline std::string ToString() const
 	{
@@ -60,7 +72,7 @@ public:
 
 	inline std::string GetName() const
 	{
-		return name.ToString();
+		return this ? name.ToString() : "None";
 	}
 
 	inline std::string GetFullName() const
@@ -114,5 +126,16 @@ public:
 	inline int32 Num()
 	{
 		return objObjects.numElements;
+	}
+	inline UObject* Find(std::string FullName)
+	{
+		for (int i = 0; i < Num(); i++)
+		{
+			UObject* current = ByIndex(i);
+
+			if (current && current->GetName() == FullName)
+				return current;
+		}
+		return nullptr;
 	}
 };

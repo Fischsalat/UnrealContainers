@@ -98,7 +98,7 @@ namespace UE
 
 		public:
 			FBaseArrayIterator(TArray<TArrayType>& Array)
-				: ItArray(Array), Index(Array.max)
+				: ItArray(Array), Index(Array.Count)
 			{
 			}
 			FBaseArrayIterator(TArray<TArrayType>& Array, int32 CurrentIndex)
@@ -680,13 +680,13 @@ namespace UE
 			{
 				return ElementIt = OtherIt.ElementIt;
 			}
-			FORCEINLINE ElementType& operator*()
+			FORCEINLINE SetType& operator*()
 			{
-				return *(ElementType*)&*ElementIt;
+				return *ElementIt.Value;
 			}
-			FORCEINLINE const ElementType& operator*() const
+			FORCEINLINE const SetType& operator*() const
 			{
-				return *(ElementType*)&*ElementIt;
+				return *ElementIt.Value;
 			}
 			FORCEINLINE ElementType& operator->()
 			{
