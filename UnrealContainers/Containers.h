@@ -50,15 +50,32 @@ namespace UE
 		}
 		FORCEINLINE void Reset(int MinSizeAfterReset = 0)
 		{
-			if (MaxElements >= MinSizeAfterReset)
-			{
-				Count = 0;
+			MaxElements = MinSizeAfterReset;
+			Count = 0;
 
-			}
+			Free(Data);
+			Data = Malloc(MinSizeAfterReset * sizeof(TArrayType), alignof(TArrayType));
 		}
-		FORCEINLINE void RemoveAt(const int Index, const int Lenght)
+		FORCEINLINE bool RemoveSingle(const int Index)
 		{
-			
+			if (Index < Count)
+			{
+				if(Index != Count - 1)
+					Data[Index] = Data[Count - 1];
+
+				--Count;
+
+				return true;
+			}
+			return false;
+		}
+		FORCEINLINE void RemoveAt(const int Index, int Lenght = 1)
+		{
+			for(; Lenght != 0; --Lenght)
+			{
+				if (!RemoveSingle(Index))
+					break;
+			}
 		}
 		FORCEINLINE void Add(TArrayType InData...)
 		{
@@ -76,6 +93,10 @@ namespace UE
 			MaxElements = 0;
 		}
 
+		FORCEINLINE explicit operator bool()
+		{
+			return MaxElements > 0 && Count > 0 && Data;
+		}
 		FORCEINLINE TArrayType& operator[](int i)
 		{
 			return Data[i];

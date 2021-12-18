@@ -7,19 +7,21 @@
 
 using namespace UE;
 
+#define PRINTBOOL(b) std::cout << (b ? "true\n" : "false\n")
+
 struct FText
 {
 	uint8 pad[0x18];
 };
 
-#define Super(obj) *(UObject**)(int64(obj) + 0x30)
+#define SUPER(obj) *(UObject**)(int64(obj) + 0x30)
 
 inline bool IsA(UObject* Obj, UObject* Class)
 {
-	if (!Obj || Obj->GetFullName().find("Default__") != -1)
+	if (!Obj || Obj->GetName().find("Default__") != -1)
 		return false;
 	
-	for (UObject* clss = Obj->privateClass; clss; clss = Super(clss))
+	for (UObject* clss = Obj->privateClass; clss; clss = SUPER(clss))
 	{
 		if (clss == Class)
 			return true;
@@ -44,14 +46,14 @@ void Main()
 		if (!current)
 			continue;
 		
-		if (current->GetFullName() == "UserDefinedEnum Engine.Default__UserDefinedEnum")
+		if (current->GetName() == "Default__UserDefinedEnum")
 		{
 			std::cout << current << "\n";
 
 			TSet<TPair<FName, FText>>& mySet = *(TSet<TPair<FName, FText>>*)((uint8*)current + 0x60);
 			TMap<FName, FText>& myMap = *(TMap<FName, FText>*)((uint8*)current + 0x60);
 			TBitArray& myBits = *(TBitArray*)((uint8*)current + 0x70);
-		}
+		}	
 	}
 
 }

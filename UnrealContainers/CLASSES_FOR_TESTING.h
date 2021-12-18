@@ -133,7 +133,7 @@ public:
 		{
 			UObject* current = ByIndex(i);
 
-			if (current && current->GetName() == FullName)
+			if (current && current->GetFullName() == FullName)
 				return current;
 		}
 		return nullptr;
