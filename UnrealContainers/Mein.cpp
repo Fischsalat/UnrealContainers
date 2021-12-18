@@ -37,24 +37,7 @@ void Main()
 	freopen_s(&f, "CONOUT$", "w", stdout);
 	freopen_s(&f, "CONOUT$", "w", stderr);
 
-	GObjects = reinterpret_cast<FUObjectArray*>(uintptr_t(GetModuleHandle(0)) + 0x62717C0);	
-
-	for (int i = 0; i < GObjects->Num(); i++)
-	{
-		UObject* current = GObjects->ByIndex(i);
-
-		if (!current)
-			continue;
-		
-		if (current->GetName() == "Default__UserDefinedEnum")
-		{
-			std::cout << current << "\n";
-
-			TSet<TPair<FName, FText>>& mySet = *(TSet<TPair<FName, FText>>*)((uint8*)current + 0x60);
-			TMap<FName, FText>& myMap = *(TMap<FName, FText>*)((uint8*)current + 0x60);
-			TBitArray& myBits = *(TBitArray*)((uint8*)current + 0x70);
-		}	
-	}
+	
 
 }
 

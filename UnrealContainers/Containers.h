@@ -69,21 +69,30 @@ namespace UE
 			}
 			return false;
 		}
-		FORCEINLINE void RemoveAt(const int Index, int Lenght = 1)
+		FORCEINLINE void RemoveAt(int Index, int Lenght = 1)
 		{
 			for(; Lenght != 0; --Lenght)
 			{
-				if (!RemoveSingle(Index))
+				if (!RemoveSingle(Index++))
 					break;
 			}
 		}
-		FORCEINLINE void Add(TArrayType InData...)
+		FORCEINLINE void AddSingle(TArrayType InData)
 		{
-			int Num = sizeof(InData) / sizeof(TArrayType);
-
-			Reserve(Num);
+			Reserve(1);
 			Data[Count] = InData;
-			Count += Num;
+			++Count;
+		}
+		FORCEINLINE void Add(int n, TArrayType InData...)
+		{
+			va_list MyList;
+			va_start(MyList, n);
+
+			for (int i = 0; i < n; i++)
+			{
+				AddSingle(va_arg(MyList, TArrayType));
+			}
+			va_end(MyList);
 		};
 		FORCEINLINE void FreeArray()
 		{
