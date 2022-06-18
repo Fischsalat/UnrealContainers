@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Containers.h">
+    <ClInclude Include="CLASSES_FOR_TESTING.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="CLASSES_FOR_TESTING.h">
+    <ClInclude Include="Containers.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
