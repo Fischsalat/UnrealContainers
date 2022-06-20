@@ -546,7 +546,7 @@ namespace UE
             void FindNextSetBit()
             {
                 //InlineData is the first 16-bytes of TBitArray
-                const uint32* ArrayData = (IteratedArray.NumBits < IteratedArray.Data.NumInlineBits() ? (uint32*)(&IteratedArray) : IteratedArray.Data.SecondaryData);
+                const uint32* ArrayData = (IteratedArray.Data.SecondaryData ? IteratedArray.Data.SecondaryData : (uint32*)&IteratedArray.Data.InlineData);
 
                 const int32 ArrayNum = IteratedArray.NumBits;
                 const int32 LastDWORDIndex = (ArrayNum - 1) / NumBitsPerDWORD;
@@ -559,7 +559,7 @@ namespace UE
 
                     if (this->DWORDIndex > LastDWORDIndex)
                     {
-                        CurrentBitIndex += ArrayNum;
+                        CurrentBitIndex = ArrayNum;
                         return;
                     }
 
