@@ -24,9 +24,6 @@
     <ClInclude Include="ContainersRewrite.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="ContainersRewrite_FRIEND_TEST.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Mein.cpp">

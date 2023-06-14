@@ -5,10 +5,10 @@
 //#include "Containers.h"
 
 //#include "ContainersRewrite.h"
-#include "ContainersRewrite_FRIEND_TEST.h"
-//#include "CLASSES_FOR_TESTING.h"
+#include "ContainersRewrite.h"
 
 //using namespace UE;
+
 
 #define PRINTBOOL(b) std::cout << (b ? "true\n" : "false\n")
 
@@ -55,6 +55,13 @@ void Main()
 			Value = 9.6f;
 		}
 	}
+
+	UC::TMap<float, int> map;
+
+	UC::Iterators::TContainerIterator<UC::TArray, float> myFill(MyFloatingArray);
+	UC::Iterators::TContainerIterator<UC::TArray, float, std::nullptr_t> myFilldf(MyFloatingArray);
+
+	UC::Iterators::TContainerIterator<UC::TArray, float, std::nullptr_t>::DataType Value = { 5403.40f, nullptr };
 
 	auto It = UC::begin(MyOtherArray);
 

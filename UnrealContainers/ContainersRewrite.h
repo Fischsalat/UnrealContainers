@@ -3,6 +3,7 @@
 #pragma once
 #include <string>
 
+
 namespace UC /*UnrealContainers*/
 {
 	typedef __int8 int8;
@@ -22,12 +23,43 @@ namespace UC /*UnrealContainers*/
 		inline void  (*Free)(void* Memory) = nullptr; // nullptr safe
 	}
 
-	template<typename DataType>
+	namespace UEHelperFunctions
+	{
+		inline uint32 FloorLog2(uint32 Value)
+		{
+			uint32 pos = 0;
+			if (Value >= 1 << 16) { Value >>= 16; pos += 16; }
+			if (Value >= 1 << 8) { Value >>= 8; pos += 8; }
+			if (Value >= 1 << 4) { Value >>= 4; pos += 4; }
+			if (Value >= 1 << 2) { Value >>= 2; pos += 2; }
+			if (Value >= 1 << 1) { pos += 1; }
+			return pos;
+		}
+
+		inline uint32 CountLeadingZeros(uint32 Value)
+		{
+			if (Value == 0) return 32;
+			return 31 - FloorLog2(Value);
+		}
+	}
+
+	namespace Iterators
+	{
+		class FBitArrayIterator;
+
+		template<template<typename...> class OuterType, typename T1, typename T2 = void>
+		class TContainerIterator;
+	}
+
+	template<typename ArrayDataType>
 	class TArray
 	{
+	public:
+		using TArrayType = ArrayDataType;
+
 	protected:
-		static constexpr int32 TypeSize = sizeof(DataType);
-		static constexpr int32 TypeAlign = alignof(DataType);
+		static constexpr int32 TypeSize = sizeof(ArrayDataType);
+		static constexpr int32 TypeAlign = alignof(ArrayDataType);
 
 	public:
 		TArray()
@@ -36,7 +68,7 @@ namespace UC /*UnrealContainers*/
 		}
 
 		TArray(uint32 InitSize)
-			: Data((DataType*)FMemory::Malloc(InitSize * TypeSize, TypeAlign)), NumElements(0), MaxElements(InitSize)
+			: Data((ArrayDataType*)FMemory::Malloc(InitSize * TypeSize, TypeAlign)), NumElements(0), MaxElements(InitSize)
 		{
 		}
 
@@ -48,7 +80,7 @@ namespace UC /*UnrealContainers*/
 
 		inline void Free() { FMemory::Free(Data); NumElements = 0; MaxElements = 0; }
 
-		inline void Add(const DataType& Element)
+		inline void Add(const ArrayDataType& Element)
 		{
 			if (GetSlack() > 0)
 				Reserve(3);
@@ -79,80 +111,29 @@ namespace UC /*UnrealContainers*/
 	private:
 		inline int32 GetSlack() const { return MaxElements - NumElements; }
 
-		inline void Reserve(int32 Count) { MaxElements += Count; FMemory::Realloc(Data, MaxElements, alignof(DataType)); }
+		inline void Reserve(int32 Count) { MaxElements += Count; FMemory::Realloc(Data, MaxElements, TypeAlign); }
 
 		inline void VerifyIndex (int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
 
 	public:
-		inline       DataType& operator[](int32 Index)       { VerifyIndex(Index); return Data[Index]; }
-		inline const DataType& operator[](int32 Index) const { VerifyIndex(Index); return Data[Index]; }
+		inline       ArrayDataType& operator[](int32 Index)       { VerifyIndex(Index); return Data[Index]; }
+		inline const ArrayDataType& operator[](int32 Index) const { VerifyIndex(Index); return Data[Index]; }
 
-		inline bool operator==(const TArray<DataType>& Other) const { return Data == Other.Data; }
-		inline bool operator!=(const TArray<DataType>& Other) const { return Data != Other.Data; }
-
-	public:
-		class FArrayIterator
-		{
-		private:
-			using TArrayType = TArray<DataType>;
-
-		private:
-			uint32 CurrentIndex;
-			TArrayType& IteratedArray;
-
-		public:
-			FArrayIterator(TArrayType& Array)
-				: IteratedArray(Array)
-				, CurrentIndex(Array.Count)
-			{
-			}
-			FArrayIterator(TArrayType& Array, uint32 CurrentIndex)
-				: IteratedArray(Array)
-				, CurrentIndex(CurrentIndex)
-			{
-			}
-
-		public:
-			inline       DataType& operator*()       { return IteratedArray[CurrentIndex]; }
-			inline const DataType& operator*() const { return IteratedArray[CurrentIndex]; }
-
-			inline       DataType*  operator->()       { return &IteratedArray[CurrentIndex]; }
-			inline const DataType*  operator->() const { return &IteratedArray[CurrentIndex]; }
-
-			inline FArrayIterator& operator++() { ++CurrentIndex; return *this; }
-			inline FArrayIterator& operator--() { --CurrentIndex; return *this; }
-
-			inline bool operator==(const FArrayIterator& Other) const { return CurrentIndex == Other.CurrentIndex && IteratedArray == Other.IteratedArray; }
-			inline bool operator!=(const FArrayIterator& Other) const { return CurrentIndex != Other.CurrentIndex || IteratedArray != Other.IteratedArray; }
-		};
+		inline bool operator==(const TArray<ArrayDataType>& Other) const { return Data == Other.Data; }
+		inline bool operator!=(const TArray<ArrayDataType>& Other) const { return Data != Other.Data; }
 
 	public:
-		//inline FArrayIterator begin()       { return FArrayIterator(*this, 0); }
-		//inline FArrayIterator begin() const { return FArrayIterator(*this, 0); }
-		//
-		//inline FArrayIterator end()       { return FArrayIterator(*this, NumElements); }
-		//inline FArrayIterator end() const { return FArrayIterator(*this, NumElements); }
-
-		friend class FArrayIterator begin(TArray& Array);
-		friend class FArrayIterator end(TArray& Array);
+		//template<typename T> friend const Iterators::TArrayIterator<ArrayDataType> begin(const TArray& Array);
+		//template<typename T> friend const Iterators::TArrayIterator<ArrayDataType> end  (const TArray& Array);
+		template<typename T> friend Iterators::TContainerIterator<TArray, ArrayDataType> begin(const TArray& Array);
+		template<typename T> friend Iterators::TContainerIterator<TArray, ArrayDataType> end(const TArray& Array);
 
 	protected:
-		DataType* Data;
+		ArrayDataType* Data;
 		int32 NumElements;
 		int32 MaxElements;
 	};
 
-	template<typename T>
-	TArray<T>::FArrayIterator begin(TArray<T>& Array)
-	{
-		return TArray<T>::FArrayIterator(Array, 0);
-	}
-
-	template<typename T>
-	TArray<T>::FArrayIterator end(TArray<T>& Array)
-	{
-		return TArray<T>::FArrayIterator(Array, Array.NumElements);
-	}
 
 	class FString : public TArray<wchar_t>
 	{
@@ -204,5 +185,300 @@ namespace UC /*UnrealContainers*/
 		inline bool operator==(const FString& Other) const { return Other ? wcscmp(Data, Other.Data) == 0 : false; }
 		inline bool operator!=(const FString& Other) const { return Other ? wcscmp(Data, Other.Data) != 0 : true;  }
 	};
+
+	template<int32 Size, uint32 Alignment>
+	struct TAlignedBytes
+	{
+		alignas(Alignment) uint8 Pad[Size];
+	};
+
+	template<uint32 NumInlineElements>
+	class TInlineAllocator
+	{
+	public:
+		template<typename ElementType>
+		class ForElementType
+		{
+		private:
+			static constexpr int32 TypeSize = sizeof(ElementType);
+			static constexpr int32 TypeAlign = alignof(ElementType);
+
+		public:
+			inline ElementType* GetAllocation() const { return SecondaryData ? SecondaryData : (ElementType*)InlineData; }
+
+		private:
+			TAlignedBytes<TypeSize, TypeAlign> InlineData[NumInlineElements];
+			ElementType* SecondaryData;
+		};
+	};
+
+	class FBitArray
+	{
+	private:
+		TInlineAllocator<4>::ForElementType<int32> Data;
+		int32 NumBits;
+		int32 MaxBits;
+
+	public:
+		inline int32 Num() const { return NumBits; }
+		inline int32 Max() const { return MaxBits; }
+
+		inline uint32* GetData() const { return (uint32*)Data.GetAllocation(); }
+	};
+
+	template<typename ElementType>
+	union TSparseArrayElementOrFreeListLink
+	{
+		ElementType ElementData;
+
+		struct
+		{
+			int32 PrevFreeIndex;
+			int32 NextFreeIndex;
+		};
+	};
+
+	template<typename SparseArrayDataType>
+	class TSparseArray
+	{
+	private:
+		static constexpr int32 TypeSize = sizeof(SparseArrayDataType);
+		static constexpr int32 TypeAlign = alignof(SparseArrayDataType);
+
+	private:
+		using FElementOrFreeListLink = TSparseArrayElementOrFreeListLink<TAlignedBytes<TypeSize, TypeAlign>>;
+
+	private:
+		TArray<FElementOrFreeListLink> Data;
+		FBitArray AllocationFlags;
+		int32 FirstFreeIndex;
+		int32 NumFreeIndices;
+
+	public:
+	};
+
+	template <typename KeyType, typename ValueType>
+	class TPair
+	{
+	private:
+		KeyType First;
+		ValueType Second;
+
+	public:
+		TPair(KeyType Key, ValueType Value)
+			: First(Key)
+			, Second(Value)
+		{
+		}
+
+	public:
+		FORCEINLINE KeyType& Key()
+		{
+			return First;
+		}
+		FORCEINLINE const KeyType& Key() const
+		{
+			return First;
+		}
+		FORCEINLINE ValueType& Value()
+		{
+			return Second;
+		}
+		FORCEINLINE const ValueType& Value() const
+		{
+			return Second;
+		}
+	};
+
+	template<typename SetDataType>
+	class TSet
+	{
+
+	};
+
+
+	template<typename KeyType, typename ValueType>
+	class TMap
+	{
+		TSet<TPair<KeyType, ValueType>> Elements;
+	};
+
+	namespace Iterators
+	{
+		template<typename T>
+		class TArrayIterator
+		{
+		private:
+			using TArrayType = TArray<T>;
+			using DataType = T;
+
+		private:
+			uint32 CurrentIndex;
+			TArrayType& IteratedArray;
+
+		public:
+			TArrayIterator(const TArrayType& Array)
+				: IteratedArray(const_cast<TArrayType&>(Array))
+				, CurrentIndex(Array.Count)
+			{
+			}
+			TArrayIterator(const TArrayType& Array, uint32 CurrentIndex)
+				: IteratedArray(const_cast<TArrayType&>(Array))
+				, CurrentIndex(CurrentIndex)
+			{
+			}
+
+		public:
+			inline       DataType& operator*()       { return IteratedArray[CurrentIndex]; }
+			inline const DataType& operator*() const { return IteratedArray[CurrentIndex]; }
+
+			inline       DataType* operator->()       { return &IteratedArray[CurrentIndex]; }
+			inline const DataType* operator->() const { return &IteratedArray[CurrentIndex]; }
+
+			inline TArrayIterator& operator++() { ++CurrentIndex; return *this; }
+			inline TArrayIterator& operator--() { --CurrentIndex; return *this; }
+
+			inline bool operator==(const TArrayIterator& Other) const { return CurrentIndex == Other.CurrentIndex && IteratedArray == Other.IteratedArray; }
+			inline bool operator!=(const TArrayIterator& Other) const { return CurrentIndex != Other.CurrentIndex || IteratedArray != Other.IteratedArray; }
+		};
+
+
+		template<template<typename...> class OuterType, typename T1, typename T2 = void>
+		class TContainerIterator
+		{
+		public:
+			using ContainerType = OuterType<T1>;
+			using DataType = std::conditional_t<std::is_same_v<T2, void>, T1, TPair<T1, T2>>;
+
+		private:
+			uint32 CurrentIndex;
+			ContainerType& IteratedContainer;
+
+		public:
+			TContainerIterator(const ContainerType& Container)
+				: IteratedContainer(const_cast<ContainerType&>(Container))
+				, CurrentIndex(Container.Num())
+			{
+			}
+			TContainerIterator(const ContainerType& Container, uint32 CurrentIndex)
+				: IteratedContainer(const_cast<ContainerType&>(Container))
+				, CurrentIndex(CurrentIndex)
+			{
+			}
+
+		public:
+			inline       DataType& operator*()       { return IteratedContainer[CurrentIndex]; }
+			inline const DataType& operator*() const { return IteratedContainer[CurrentIndex]; }
+
+			inline       DataType* operator->()       { return &IteratedContainer[CurrentIndex]; }
+			inline const DataType* operator->() const { return &IteratedContainer[CurrentIndex]; }
+
+			inline TContainerIterator& operator++() { ++CurrentIndex; return *this; }
+			inline TContainerIterator& operator--() { --CurrentIndex; return *this; }
+
+			inline bool operator==(const TContainerIterator& Other) const { return CurrentIndex == Other.CurrentIndex && IteratedContainer == Other.IteratedContainer; }
+			inline bool operator!=(const TContainerIterator& Other) const { return CurrentIndex != Other.CurrentIndex || IteratedContainer != Other.IteratedContainer; }
+		};
+
+		class FRelativeBitReference
+		{
+		protected:
+			static constexpr int32 NumBitsPerDWORD = 32;
+			static constexpr int32 NumBitsPerDWORDLogTwo = 5;
+
+		public:
+			FORCEINLINE explicit FRelativeBitReference(int32 BitIndex)
+				: WordIndex(BitIndex >> NumBitsPerDWORDLogTwo)
+				, Mask(1 << (BitIndex & (NumBitsPerDWORD - 1)))
+			{
+			}
+
+			int32  WordIndex;
+			uint32 Mask;
+		};
+
+		class FSetBitIterator : public FRelativeBitReference
+		{
+		private:
+			const FBitArray& Array;
+
+			uint32 UnvisitedBitMask;
+			int32 CurrentBitIndex;
+			int32 BaseBitIndex;
+
+		public:
+			explicit FSetBitIterator(const FBitArray& InArray, int32 StartIndex = 0)
+				: FRelativeBitReference(StartIndex)
+				, Array(InArray)
+				, UnvisitedBitMask((~0U) << (StartIndex & (NumBitsPerDWORD - 1)))
+				, CurrentBitIndex(StartIndex)
+				, BaseBitIndex(StartIndex & ~(NumBitsPerDWORD - 1))
+			{
+				if (StartIndex != Array.Num())
+					FindFirstSetBit();
+			}
+
+		public:
+			inline FSetBitIterator& operator++()
+			{
+				// Mark the current bit as visited.
+				UnvisitedBitMask &= ~this->Mask;
+
+				// Find the first set bit that hasn't been visited yet.
+				FindFirstSetBit();
+
+				return *this;
+			}
+
+			inline explicit operator bool() const { return CurrentBitIndex < Array.Num(); }
+
+			inline bool operator==(const FSetBitIterator& Rhs) const { return CurrentBitIndex == Rhs.CurrentBitIndex && &Array == &Rhs.Array; }
+			inline bool operator!=(const FSetBitIterator& Rhs) const { return CurrentBitIndex != Rhs.CurrentBitIndex || &Array != &Rhs.Array; }
+
+		public:
+			inline int32 GetIndex() { return CurrentBitIndex; }
+
+			void FindFirstSetBit()
+			{
+				const uint32* ArrayData = Array.GetData();
+				const int32   ArrayNum = Array.Num();
+				const int32   LastWordIndex = (ArrayNum - 1) / NumBitsPerDWORD;
+
+				// Advance to the next non-zero uint32.
+				uint32 RemainingBitMask = ArrayData[this->WordIndex] & UnvisitedBitMask;
+				while (!RemainingBitMask)
+				{
+					++this->WordIndex;
+					BaseBitIndex += NumBitsPerDWORD;
+					if (this->WordIndex > LastWordIndex)
+					{
+						// We've advanced past the end of the array.
+						CurrentBitIndex = ArrayNum;
+						return;
+					}
+
+					RemainingBitMask = ArrayData[this->WordIndex];
+					UnvisitedBitMask = ~0;
+				}
+
+				const uint32 NewRemainingBitMask = RemainingBitMask & (RemainingBitMask - 1);
+
+				this->Mask = NewRemainingBitMask ^ RemainingBitMask;
+
+				CurrentBitIndex = BaseBitIndex + NumBitsPerDWORD - 1 - UEHelperFunctions::CountLeadingZeros(this->Mask);
+
+				if (CurrentBitIndex > ArrayNum)
+					CurrentBitIndex = ArrayNum;
+				
+			}
+		};
+	}
+
+	//template<typename T> Iterators::TArrayIterator<T> begin(const TArray<T>& Array) { return Iterators::TArrayIterator<T>(Array, 0); }
+	//template<typename T> Iterators::TArrayIterator<T> end  (const TArray<T>& Array) { return Iterators::TArrayIterator<T>(Array, Array.Num()); }
+
+
+	template<typename T> Iterators::TContainerIterator<TArray, T> begin(const TArray<T>& Array) { return Iterators::TContainerIterator<TArray, T>(Array, 0); }
+	template<typename T> Iterators::TContainerIterator<TArray, T> end(const TArray<T>& Array)   { return Iterators::TContainerIterator<TArray, T>(Array, Array.Num()); }
 }
 
