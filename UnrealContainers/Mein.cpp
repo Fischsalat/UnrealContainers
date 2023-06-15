@@ -32,6 +32,7 @@
 //	return false;
 //}
 
+
 void Main()
 {
 	AllocConsole();
@@ -63,8 +64,26 @@ void Main()
 
 	UC::Iterators::TContainerIterator<UC::TArray, float, std::nullptr_t>::DataType Value = { 5403.40f, nullptr };
 
-	auto It = UC::begin(MyOtherArray);
+	UC::Iterators::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeIt(MyFloatingArray);
+	UC::Iterators::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeEnd(MyFloatingArray, MyFloatingArray.Num());
 
+	UC::TSparseArray<float> SparseTest;
+
+	UC::Iterators::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseIt(SparseTest);
+	UC::Iterators::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseEnd(SparseTest, SparseTest.Num());
+
+	for (; SomeIt != SomeEnd; ++SomeIt)
+	{
+		float& ValueRef = *SomeIt;
+	}
+
+	for (; SomeSparseIt != SomeSparseEnd; ++SomeSparseIt)
+	{
+		float& ValueRef = *SomeSparseIt;
+	}
+
+	auto It = UC::begin(MyOtherArray);
+	
 	UC::FString Str;
 	UC::FString StrInt(0x69);
 	UC::FString StrWChar0(L"Hell world!");

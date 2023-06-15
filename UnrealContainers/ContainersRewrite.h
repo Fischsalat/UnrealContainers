@@ -45,15 +45,28 @@ namespace UC /*UnrealContainers*/
 
 	namespace Iterators
 	{
-		class FBitArrayIterator;
+		class FSetBitIterator;
 
 		template<template<typename...> class OuterType, typename T1, typename T2 = void>
 		class TContainerIterator;
+
+		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
+		class TContainerIteratorSuperTest;
 	}
 
 	template<typename ArrayDataType>
 	class TArray
 	{
+	private:
+		template<template<typename...> class OuterType, typename T1, typename T2 = void>
+		friend class Iterators::TContainerIterator;
+
+		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
+		friend class Iterators::TContainerIteratorSuperTest;
+
+		template<typename SparseArrayDataType>
+		friend class TSparseArray;
+
 	public:
 		using TArrayType = ArrayDataType;
 
@@ -114,6 +127,11 @@ namespace UC /*UnrealContainers*/
 		inline void Reserve(int32 Count) { MaxElements += Count; FMemory::Realloc(Data, MaxElements, TypeAlign); }
 
 		inline void VerifyIndex (int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
+
+		inline       ArrayDataType& GetUnsafe(int32 Index)       { return Data[Index]; }
+		inline const ArrayDataType& GetUnsafe(int32 Index) const { return Data[Index]; }
+
+		inline const void* GetSubContainerForIterator() const { return Data; }
 
 	public:
 		inline       ArrayDataType& operator[](int32 Index)       { VerifyIndex(Index); return Data[Index]; }
@@ -214,16 +232,28 @@ namespace UC /*UnrealContainers*/
 
 	class FBitArray
 	{
+	protected:
+		static constexpr int32 NumBitsPerDWORD = 32;
+		static constexpr int32 NumBitsPerDWORDLogTwo = 5;
+
 	private:
 		TInlineAllocator<4>::ForElementType<int32> Data;
 		int32 NumBits;
 		int32 MaxBits;
 
 	public:
+		inline bool IsValidIndex(int32 Index) const { return Index > 0 && Index < NumBits; }
+
 		inline int32 Num() const { return NumBits; }
 		inline int32 Max() const { return MaxBits; }
 
 		inline uint32* GetData() const { return (uint32*)Data.GetAllocation(); }
+
+	private:
+		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
+
+	public:
+		inline bool operator[](int32 Index) const { VerifyIndex(Index); return GetData()[Index / NumBitsPerDWORD] & (1 << (Index & (NumBitsPerDWORD - 1))); }
 	};
 
 	template<typename ElementType>
@@ -242,6 +272,13 @@ namespace UC /*UnrealContainers*/
 	class TSparseArray
 	{
 	private:
+		template<template<typename...> class OuterType, typename T1, typename T2 = void>
+		friend class Iterators::TContainerIterator;
+
+		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
+		friend class Iterators::TContainerIteratorSuperTest;
+		
+	private:
 		static constexpr int32 TypeSize = sizeof(SparseArrayDataType);
 		static constexpr int32 TypeAlign = alignof(SparseArrayDataType);
 
@@ -255,6 +292,22 @@ namespace UC /*UnrealContainers*/
 		int32 NumFreeIndices;
 
 	public:
+		inline bool IsValidIndex(int32 Index) const { return Data.IsValidIndex(Index) && AllocationFlags[Index]; }
+
+		inline int32 Num() { return Data.Num(); }
+		inline int32 Max() { return Data.Max(); }
+
+	private:
+		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
+
+		inline const FBitArray& GetSubContainerForIterator() const { return AllocationFlags; }
+
+	public:
+		inline       SparseArrayDataType& operator[](int32 Index)       { VerifyIndex(Index); return *(SparseArrayDataType*)&Data.GetUnsafe(Index).ElementData; }
+		inline const SparseArrayDataType& operator[](int32 Index) const { VerifyIndex(Index); return *(SparseArrayDataType*)&Data.GetUnsafe(Index).ElementData; }
+
+		inline bool operator==(const TSparseArray<SparseArrayDataType>& Other) const { return Data.operator==(Other.Data); }
+		inline bool operator!=(const TSparseArray<SparseArrayDataType>& Other) const { return Data.operator==(Other.Data); }
 	};
 
 	template <typename KeyType, typename ValueType>
@@ -343,42 +396,6 @@ namespace UC /*UnrealContainers*/
 		};
 
 
-		template<template<typename...> class OuterType, typename T1, typename T2 = void>
-		class TContainerIterator
-		{
-		public:
-			using ContainerType = OuterType<T1>;
-			using DataType = std::conditional_t<std::is_same_v<T2, void>, T1, TPair<T1, T2>>;
-
-		private:
-			uint32 CurrentIndex;
-			ContainerType& IteratedContainer;
-
-		public:
-			TContainerIterator(const ContainerType& Container)
-				: IteratedContainer(const_cast<ContainerType&>(Container))
-				, CurrentIndex(Container.Num())
-			{
-			}
-			TContainerIterator(const ContainerType& Container, uint32 CurrentIndex)
-				: IteratedContainer(const_cast<ContainerType&>(Container))
-				, CurrentIndex(CurrentIndex)
-			{
-			}
-
-		public:
-			inline       DataType& operator*()       { return IteratedContainer[CurrentIndex]; }
-			inline const DataType& operator*() const { return IteratedContainer[CurrentIndex]; }
-
-			inline       DataType* operator->()       { return &IteratedContainer[CurrentIndex]; }
-			inline const DataType* operator->() const { return &IteratedContainer[CurrentIndex]; }
-
-			inline TContainerIterator& operator++() { ++CurrentIndex; return *this; }
-			inline TContainerIterator& operator--() { --CurrentIndex; return *this; }
-
-			inline bool operator==(const TContainerIterator& Other) const { return CurrentIndex == Other.CurrentIndex && IteratedContainer == Other.IteratedContainer; }
-			inline bool operator!=(const TContainerIterator& Other) const { return CurrentIndex != Other.CurrentIndex || IteratedContainer != Other.IteratedContainer; }
-		};
 
 		class FRelativeBitReference
 		{
@@ -387,7 +404,9 @@ namespace UC /*UnrealContainers*/
 			static constexpr int32 NumBitsPerDWORDLogTwo = 5;
 
 		public:
-			FORCEINLINE explicit FRelativeBitReference(int32 BitIndex)
+			FRelativeBitReference() = default;
+
+			inline explicit FRelativeBitReference(int32 BitIndex)
 				: WordIndex(BitIndex >> NumBitsPerDWORDLogTwo)
 				, Mask(1 << (BitIndex & (NumBitsPerDWORD - 1)))
 			{
@@ -407,6 +426,8 @@ namespace UC /*UnrealContainers*/
 			int32 BaseBitIndex;
 
 		public:
+			FSetBitIterator() = default;
+
 			explicit FSetBitIterator(const FBitArray& InArray, int32 StartIndex = 0)
 				: FRelativeBitReference(StartIndex)
 				, Array(InArray)
@@ -469,8 +490,132 @@ namespace UC /*UnrealContainers*/
 
 				if (CurrentBitIndex > ArrayNum)
 					CurrentBitIndex = ArrayNum;
-				
+
 			}
+		};
+
+		template<template<typename...> class OuterType, typename T1, typename T2 = void>
+		class TContainerIterator
+		{
+		public:
+			using ContainerType = OuterType<T1>;
+			using DataType = std::conditional_t<std::is_same_v<T2, void>, T1, TPair<T1, T2>>;
+
+		private:
+			uint32 CurrentIndex;
+			ContainerType& IteratedContainer;
+
+		public:
+			TContainerIterator(const ContainerType& Container)
+				: IteratedContainer(const_cast<ContainerType&>(Container))
+				, CurrentIndex(Container.Num())
+			{
+			}
+			TContainerIterator(const ContainerType& Container, uint32 CurrentIndex)
+				: IteratedContainer(const_cast<ContainerType&>(Container))
+				, CurrentIndex(CurrentIndex)
+			{
+			}
+
+		public:
+			inline       DataType& operator*()       { return IteratedContainer[CurrentIndex]; }
+			inline const DataType& operator*() const { return IteratedContainer[CurrentIndex]; }
+
+			inline       DataType* operator->()       { return &IteratedContainer[CurrentIndex]; }
+			inline const DataType* operator->() const { return &IteratedContainer[CurrentIndex]; }
+
+			inline TContainerIterator& operator++() { ++CurrentIndex; return *this; }
+			inline TContainerIterator& operator--() { --CurrentIndex; return *this; }
+
+			inline bool operator==(const TContainerIterator& Other) const { return CurrentIndex == Other.CurrentIndex && IteratedContainer == Other.IteratedContainer; }
+			inline bool operator!=(const TContainerIterator& Other) const { return CurrentIndex != Other.CurrentIndex || IteratedContainer != Other.IteratedContainer; }
+		};
+
+		template<typename T>
+		class ConstructionHelper
+		{
+		public:
+			template<typename DataStructureType>
+			static T Make(const DataStructureType& Container, int32 Index)
+			{
+				if constexpr (!std::is_trivial_v<T>)
+				{
+					return T(Container, Index);
+				}
+				else
+				{
+					return Index;
+				}
+			}
+		};
+
+		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
+		class TContainerIteratorSuperTest
+		{
+		public:
+			using ContainerType = OuterType<T1>;
+			using DataType = std::conditional_t<std::is_same_v<T2, void>, T1, TPair<T1, T2>>;
+
+		private:
+			static constexpr bool bIsTrivialSuperIt = std::is_trivial_v<SuperIterator>;
+
+		private:
+			SuperIterator SuperIt;
+			ContainerType& IteratedContainer;
+
+		public:
+			TContainerIteratorSuperTest() = default;
+
+			TContainerIteratorSuperTest(const ContainerType& Container)
+				: IteratedContainer(const_cast<ContainerType&>(Container))
+				, SuperIt(ConstructionHelper<SuperIterator>::template Make<decltype(Container.GetSubContainerForIterator())>(Container.GetSubContainerForIterator(), 0))
+			{
+			}
+
+			TContainerIteratorSuperTest(const ContainerType& Container, uint32 CurrentIndex)
+				: IteratedContainer(const_cast<ContainerType&>(Container))
+				, SuperIt(ConstructionHelper<SuperIterator>::template Make<decltype(Container.GetSubContainerForIterator())>(Container.GetSubContainerForIterator(), CurrentIndex))
+			{
+			}
+
+		public:
+			//inline       DataType& operator*()       { return IteratedContainer[CurrentIndex]; }
+			//inline const DataType& operator*() const { return IteratedContainer[CurrentIndex]; }
+
+			inline DataType& operator*()
+			{
+				if constexpr (!bIsTrivialSuperIt)
+				{
+					return IteratedContainer[SuperIt.GetIndex()];
+				}
+				else
+				{
+					return IteratedContainer[SuperIt];
+				}
+			}
+
+			inline int32 GetIndex()
+			{
+				if constexpr (!bIsTrivialSuperIt)
+				{
+					return SuperIt.GetIndex();
+				}
+				else
+				{
+					return SuperIt;
+				}
+			}
+
+			//inline const DataType& operator*() const { return IteratedContainer[CurrentIndex]; }
+
+			//inline       DataType* operator->()       { return &IteratedContainer[CurrentIndex]; }
+			//inline const DataType* operator->() const { return &IteratedContainer[CurrentIndex]; }
+
+			inline TContainerIteratorSuperTest& operator++() { ++SuperIt; return *this; }
+			inline TContainerIteratorSuperTest& operator--() { --SuperIt; return *this; }
+
+			inline bool operator==(const TContainerIteratorSuperTest& Other) const { return SuperIt == Other.SuperIt && IteratedContainer == Other.IteratedContainer; }
+			inline bool operator!=(const TContainerIteratorSuperTest& Other) const { return SuperIt != Other.SuperIt || IteratedContainer != Other.IteratedContainer; }
 		};
 	}
 
