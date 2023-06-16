@@ -34,37 +34,9 @@
 
 namespace It = UC::Iterators;
 
-template<typename SuperIterator, typename DataStructureType>
-static SuperIterator Make(const DataStructureType& Container, int Index)
-{
-	if constexpr (!std::is_trivial_v<SuperIterator>) {
-		return SuperIterator(Container, Index);
-	}
-	else {
-		return Index;
-	}
-}
 
 void Main()
-{
-	UC::TSet<int> Set;
-	UC::TSparseArray<int> Array;
-
-	//It::TSetIterator<int> Sett(Set);
-	//It::TContainerIteratorSuperTest<It::TSparseArrayIterator<int>, UC::TSet, UC::SetElement<int>> someIt(Set);
-	//It::TContainerIteratorSuperTest<It::TSparseArrayIterator<int>, UC::TSet, UC::TSet<int>::DataType> someIt(Set);
-	//It::TContainerIteratorSuperTest<It::TContainerIteratorSuperTest<It::FSetBitIterator, UC::TSparseArray, UC::SetElement<int>>, UC::TSet, int> myIterator(Set);
-
-	It::TSetIterator<int> MySetIterator(Set);
-	It::TSetIterator<int> MySetIteratorEnd(Set, Set.Num());
-
-	//SuperIt(Make<decltype(Container.GetSubContainerForIterator())>(Container.GetSubContainerForIterator(), CurrentIndex))
-	//auto Type = Make<
-	//	It::TContainerIteratorSuperTest<It::FSetBitIterator, UC::TSparseArray, UC::SetElement<int>>, 
-	//	decltype(Set.GetSubContainerForIterator())
-	//>(Set.GetSubContainerForIterator(), 0);
-
-	
+{	
 	AllocConsole();
 	FILE* f;
 	freopen_s(&f, "CONIN$", "r", stdin);
@@ -87,43 +59,14 @@ void Main()
 		}
 	}
 
-	UC::TMap<float, int> map;
-
-	It::TContainerIterator<UC::TArray, float> myFill(MyFloatingArray);
-	It::TContainerIterator<UC::TArray, float, std::nullptr_t> myFilldf(MyFloatingArray);
-
-	It::TContainerIterator<UC::TArray, float, std::nullptr_t>::DataType Value = { 5403.40f, nullptr };
-
-	It::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeIt(MyFloatingArray);
-	It::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeEnd(MyFloatingArray, MyFloatingArray.Num());
-
-	UC::TSparseArray<float> SparseTest;
-	UC::TSet<int> SetTest;
-
-	It::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseIt(SparseTest);
-	It::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseEnd(SparseTest, SparseTest.Num());
-
-	//It::TSparseArrayIterator<float> Sparser(SparseTest);
-	//It::TSetIterator<int> Sett(SetTest);
-
-
-	
-
-	//auto Valuef = *Sparser;
-	//auto Value3 = *Sett;
-
-
-	for (; SomeIt != SomeEnd; ++SomeIt)
-	{
-		float& ValueRef = *SomeIt;
-	}
-
-	for (; SomeSparseIt != SomeSparseEnd; ++SomeSparseIt)
-	{
-		float& ValueRef = *SomeSparseIt;
-	}
-
 	auto It = UC::begin(MyOtherArray);
+
+	UC::TSet<float> MySet;
+
+	for (float& FltRef : MySet)
+	{
+		std::cout << FltRef << std::endl;
+	}
 	
 	UC::FString Str;
 	UC::FString StrInt(0x69);
@@ -136,21 +79,12 @@ void Main()
 		{
 			std::wcout << Char << L", ";
 		}
-
-		//for (wchar_t Char : StrWChar1)
-		//{
-		//	std::wcout << Char << L", ";
-		//}
 	}
 
 	for (int i = 0; i < StrWChar0.Num(); i++)
 	{
 		std::wcout << StrWChar0[i] << L", ";
 	}
-
-	std::cout << *reinterpret_cast<uint64_t*>(&Str) << std::endl;
-	std::cout << *(reinterpret_cast<uint64_t*>(&Str) + 1) << std::endl;
-
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
