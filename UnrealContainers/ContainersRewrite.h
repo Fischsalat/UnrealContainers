@@ -72,37 +72,45 @@ namespace UC /*UnrealContainers*/
 
 
 		template<typename ArrayType>
-		using TArrayIterator_WithTempNameChange = TContainerIteratorSuperTest<int32, TArray, ArrayType>;
+		using TArrayIterator = TContainerIteratorSuperTest<int32, TArray, ArrayType>;
 
 		template<typename SparseArrayType>
 		using TSparseArrayIterator = TContainerIteratorSuperTest<FSetBitIterator, TSparseArray, SparseArrayType>;
 
 		template<typename SetType>
-		using TSetIterator = TContainerIteratorSuperTest<TSparseArrayIterator<SetType>, TSet, SetType>;
+		using TSetIterator = TContainerIteratorSuperTest<TSparseArrayIterator<typename TSet<SetType>::DataType>, TSet, SetType>;
 
 		template<typename KeyType, typename ValueType>
-		using TMapIterator = TContainerIteratorSuperTest<TSetIterator<TPair<KeyType, ValueType>>, TMap, KeyType, ValueType>;
+		using TMapIterator = TContainerIteratorSuperTest<TSetIterator<typename TMap<KeyType, ValueType>::DataType>, TMap, KeyType, ValueType>;
 	}
 
 	template<typename ArrayDataType>
 	class TArray
 	{
+	public:
+		using DataType = ArrayDataType;
+
 	private:
-		template<template<typename...> class OuterType, typename T1, typename T2 = void>
+		template<template<typename...> class OuterType, typename T1, typename T2>
 		friend class Iterators::TContainerIterator;
 
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
+		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2>
 		friend class Iterators::TContainerIteratorSuperTest;
 
 		template<typename SparseArrayDataType>
 		friend class TSparseArray;
 
 	public:
-		using TArrayType = ArrayDataType;
+		using DataType = ArrayDataType;
 
 	protected:
-		static constexpr int32 TypeSize = sizeof(ArrayDataType);
-		static constexpr int32 TypeAlign = alignof(ArrayDataType);
+		static constexpr int32 TypeSize = sizeof(DataType);
+		static constexpr int32 TypeAlign = alignof(DataType);
+
+	protected:
+		ArrayDataType* Data;
+		int32 NumElements;
+		int32 MaxElements;
 
 	public:
 		TArray()
@@ -116,11 +124,12 @@ namespace UC /*UnrealContainers*/
 		}
 
 	public:
-		inline bool IsValidIndex(int32 Index) const { return Data && Index > 0 && Index < NumElements; }
-
 		inline int32 Num() const { return NumElements; }
 		inline int32 Max() const { return NumElements; }
 
+		inline bool IsValidIndex(int32 Index) const { return Data && Index > 0 && Index < NumElements; }
+
+	public:
 		inline void Free() { FMemory::Free(Data); NumElements = 0; MaxElements = 0; }
 
 		inline void Add(const ArrayDataType& Element)
@@ -161,8 +170,6 @@ namespace UC /*UnrealContainers*/
 		inline       ArrayDataType& GetUnsafe(int32 Index)       { return Data[Index]; }
 		inline const ArrayDataType& GetUnsafe(int32 Index) const { return Data[Index]; }
 
-		inline const void* GetSubContainerForIterator() const { return Data; }
-
 	public:
 		inline       ArrayDataType& operator[](int32 Index)       { VerifyIndex(Index); return Data[Index]; }
 		inline const ArrayDataType& operator[](int32 Index) const { VerifyIndex(Index); return Data[Index]; }
@@ -173,13 +180,14 @@ namespace UC /*UnrealContainers*/
 	public:
 		//template<typename T> friend const Iterators::TArrayIterator<ArrayDataType> begin(const TArray& Array);
 		//template<typename T> friend const Iterators::TArrayIterator<ArrayDataType> end  (const TArray& Array);
-		template<typename T> friend Iterators::TContainerIterator<TArray, ArrayDataType> begin(const TArray& Array);
-		template<typename T> friend Iterators::TContainerIterator<TArray, ArrayDataType> end(const TArray& Array);
+		//template<typename T> friend Iterators::TContainerIterator<TArray, ArrayDataType> begin(const TArray& Array);
+		//template<typename T> friend Iterators::TContainerIterator<TArray, ArrayDataType> end(const TArray& Array);
+		template<typename T> friend Iterators::TArrayIterator<T> begin(const TArray& Array);
+		template<typename T> friend Iterators::TArrayIterator<T> end  (const TArray& Array);
 
-	protected:
-		ArrayDataType* Data;
-		int32 NumElements;
-		int32 MaxElements;
+
+	private:
+		inline const auto& GetDataRef() const { return Data; }
 	};
 
 
@@ -272,18 +280,21 @@ namespace UC /*UnrealContainers*/
 		int32 MaxBits;
 
 	public:
-		inline bool IsValidIndex(int32 Index) const { return Index > 0 && Index < NumBits; }
-
 		inline int32 Num() const { return NumBits; }
 		inline int32 Max() const { return MaxBits; }
 
 		inline uint32* GetData() const { return (uint32*)Data.GetAllocation(); }
+
+		inline bool IsValidIndex(int32 Index) const { return Index > 0 && Index < NumBits; }
 
 	private:
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
 
 	public:
 		inline bool operator[](int32 Index) const { VerifyIndex(Index); return GetData()[Index / NumBitsPerDWORD] & (1 << (Index & (NumBitsPerDWORD - 1))); }
+
+		inline bool operator==(const FBitArray& Other) const { return NumBits == Other.NumBits && GetData() == Other.GetData(); }
+		inline bool operator!=(const FBitArray& Other) const { return NumBits != Other.NumBits || GetData() != Other.GetData(); }
 	};
 
 	template<typename ElementType>
@@ -302,42 +313,44 @@ namespace UC /*UnrealContainers*/
 	class TSparseArray
 	{
 	private:
-		template<template<typename...> class OuterType, typename T1, typename T2 = void>
+		template<template<typename...> class OuterType, typename T1, typename T2>
 		friend class Iterators::TContainerIterator;
 
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
+		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2>
 		friend class Iterators::TContainerIteratorSuperTest;
-		
+
 	private:
 		static constexpr int32 TypeSize = sizeof(SparseArrayDataType);
 		static constexpr int32 TypeAlign = alignof(SparseArrayDataType);
 
-	private:
-		using FElementOrFreeListLink = TSparseArrayElementOrFreeListLink<TAlignedBytes<TypeSize, TypeAlign>>;
+	public:
+		using DataType = TSparseArrayElementOrFreeListLink<TAlignedBytes<TypeSize, TypeAlign>>;
 
 	private:
-		TArray<FElementOrFreeListLink> Data;
+		TArray<DataType> Data; // FElementOrFreeListLink
 		FBitArray AllocationFlags;
 		int32 FirstFreeIndex;
 		int32 NumFreeIndices;
 
 	public:
-		inline bool IsValidIndex(int32 Index) const { return Data.IsValidIndex(Index) && AllocationFlags[Index]; }
-
 		inline int32 Num() { return Data.Num(); }
 		inline int32 Max() { return Data.Max(); }
+
+		inline bool IsValidIndex(int32 Index) const { return Data.IsValidIndex(Index) && AllocationFlags[Index]; }
 
 	private:
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
 
-		inline const auto& GetSubContainerForIterator() const { return AllocationFlags; }
 
 	public:
 		inline       SparseArrayDataType& operator[](int32 Index)       { VerifyIndex(Index); return *(SparseArrayDataType*)&Data.GetUnsafe(Index).ElementData; }
 		inline const SparseArrayDataType& operator[](int32 Index) const { VerifyIndex(Index); return *(SparseArrayDataType*)&Data.GetUnsafe(Index).ElementData; }
 
 		inline bool operator==(const TSparseArray<SparseArrayDataType>& Other) const { return Data.operator==(Other.Data); }
-		inline bool operator!=(const TSparseArray<SparseArrayDataType>& Other) const { return Data.operator==(Other.Data); }
+		inline bool operator!=(const TSparseArray<SparseArrayDataType>& Other) const { return Data.operator!=(Other.Data); }
+
+	private:
+		inline const auto& GetDataRef() const { return AllocationFlags; }
 	};
 
 	template <typename KeyType, typename ValueType>
@@ -355,54 +368,73 @@ namespace UC /*UnrealContainers*/
 		}
 
 	public:
-		inline KeyType& Key()
-		{
-			return First;
-		}
-		inline const KeyType& Key() const
-		{
-			return First;
-		}
-		inline ValueType& Value()
-		{
-			return Second;
-		}
-		inline const ValueType& Value() const
-		{
-			return Second;
-		}
+		inline       KeyType& Key()       { return First; }
+		inline const KeyType& Key() const { return First; }
+
+		inline       ValueType& Value()       { return Second; }
+		inline const ValueType& Value() const { return Second; }
 	};
 
 	template<typename T>
 	class SetElement
 	{
+	private:
+		template<typename SetDataType>
+		friend class TSet;
 
+	private:
+		T Value;
+		int32 HashNextId;
+		int32 HashIndex;
 	};
 
 	template<typename SetDataType>
 	class TSet
 	{
-		using SetElementType = SetElement<SetDataType>;
+	public:
+		using DataType = SetElement<SetDataType>;
 
-		TSparseArray<SetElementType> Elements;
+	private:
+		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2>
+		friend class Iterators::TContainerIteratorSuperTest;
+
+	private:
+		TSparseArray<DataType> Elements;
 		TInlineAllocator<1>::ForElementType<int32> Hash;
 		int32 HashSize;
 
-	public: //debug
-		inline const auto& GetSubContainerForIterator() const { return Elements; }
+	public:
+		inline bool IsValidIndex(int32 Index) const { return Elements.IsValidIndex(Index); }
+
+		inline int32 Num() { return Elements.Num(); }
+		inline int32 Max() { return Elements.Max(); }
+
+	public:
+		inline       SetDataType& operator[] (int32 Index)       { return Elements[Index].Value; }
+		inline const SetDataType& operator[] (int32 Index) const { return Elements[Index].Value; }
+		
+		inline bool operator==(const TSet<SetDataType>& Other) const { Elements.operator==(Other.Data); }
+		inline bool operator!=(const TSet<SetDataType>& Other) const { Elements.operator!=(Other.Data); }
+
+	private: //debug
+		inline const auto& GetDataRef() const { return Elements; }
 	};
 
 
 	template<typename KeyType, typename ValueType>
 	class TMap
 	{
-		TSet<TPair<KeyType, ValueType>> Elements;
+	public:
+		using DataType = TPair<KeyType, ValueType>;
+
+	private:
+		TSet<DataType> Elements;
 	};
 
 	namespace Iterators
 	{
 		template<typename T>
-		class TArrayIterator
+		class TArrayIterator_WithTempNameChange
 		{
 		private:
 			using TArrayType = TArray<T>;
@@ -413,12 +445,12 @@ namespace UC /*UnrealContainers*/
 			TArrayType& IteratedArray;
 
 		public:
-			TArrayIterator(const TArrayType& Array)
+			TArrayIterator_WithTempNameChange(const TArrayType& Array)
 				: IteratedArray(const_cast<TArrayType&>(Array))
 				, CurrentIndex(Array.Count)
 			{
 			}
-			TArrayIterator(const TArrayType& Array, uint32 CurrentIndex)
+			TArrayIterator_WithTempNameChange(const TArrayType& Array, uint32 CurrentIndex)
 				: IteratedArray(const_cast<TArrayType&>(Array))
 				, CurrentIndex(CurrentIndex)
 			{
@@ -431,11 +463,11 @@ namespace UC /*UnrealContainers*/
 			inline       DataType* operator->()       { return &IteratedArray[CurrentIndex]; }
 			inline const DataType* operator->() const { return &IteratedArray[CurrentIndex]; }
 
-			inline TArrayIterator& operator++() { ++CurrentIndex; return *this; }
-			inline TArrayIterator& operator--() { --CurrentIndex; return *this; }
+			inline TArrayIterator_WithTempNameChange& operator++() { ++CurrentIndex; return *this; }
+			inline TArrayIterator_WithTempNameChange& operator--() { --CurrentIndex; return *this; }
 
-			inline bool operator==(const TArrayIterator& Other) const { return CurrentIndex == Other.CurrentIndex && IteratedArray == Other.IteratedArray; }
-			inline bool operator!=(const TArrayIterator& Other) const { return CurrentIndex != Other.CurrentIndex || IteratedArray != Other.IteratedArray; }
+			inline bool operator==(const TArrayIterator_WithTempNameChange& Other) const { return CurrentIndex == Other.CurrentIndex && IteratedArray == Other.IteratedArray; }
+			inline bool operator!=(const TArrayIterator_WithTempNameChange& Other) const { return CurrentIndex != Other.CurrentIndex || IteratedArray != Other.IteratedArray; }
 		};
 
 
@@ -447,8 +479,6 @@ namespace UC /*UnrealContainers*/
 			static constexpr int32 NumBitsPerDWORDLogTwo = 5;
 
 		public:
-			FRelativeBitReference() = default;
-
 			inline explicit FRelativeBitReference(int32 BitIndex)
 				: WordIndex(BitIndex >> NumBitsPerDWORDLogTwo)
 				, Mask(1 << (BitIndex & (NumBitsPerDWORD - 1)))
@@ -469,8 +499,6 @@ namespace UC /*UnrealContainers*/
 			int32 BaseBitIndex;
 
 		public:
-			FSetBitIterator() = default;
-
 			explicit FSetBitIterator(const FBitArray& InArray, int32 StartIndex = 0)
 				: FRelativeBitReference(StartIndex)
 				, Array(InArray)
@@ -537,7 +565,7 @@ namespace UC /*UnrealContainers*/
 			}
 		};
 
-		template<template<typename...> class OuterType, typename T1, typename T2 = void>
+		template<template<typename...> class OuterType, typename T1, typename T2 /* = void */>
 		class TContainerIterator
 		{
 		public:
@@ -592,7 +620,7 @@ namespace UC /*UnrealContainers*/
 			}
 		};
 
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
+		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2>
 		class TContainerIteratorSuperTest
 		{
 		public:
@@ -603,21 +631,26 @@ namespace UC /*UnrealContainers*/
 			static constexpr bool bIsTrivialSuperIt = std::is_trivial_v<SuperIterator>;
 
 		private:
+			template<typename DataStructureType>
+			static SuperIterator Make(const DataStructureType& Container, int32 Index)
+			{
+				if constexpr (!std::is_trivial_v<SuperIterator>) {
+					return SuperIterator(Container, Index);
+				} else {
+					return Index;
+				}
+			}
+
+		private:
 			SuperIterator SuperIt;
 			ContainerType& IteratedContainer;
 
 		public:
 			TContainerIteratorSuperTest() = default;
 
-			TContainerIteratorSuperTest(const ContainerType& Container)
+			TContainerIteratorSuperTest(const ContainerType& Container, uint32 CurrentIndex = 0)
 				: IteratedContainer(const_cast<ContainerType&>(Container))
-				, SuperIt(ConstructionHelper<SuperIterator>::template Make<decltype(Container.GetSubContainerForIterator())>(Container.GetSubContainerForIterator(), 0))
-			{
-			}
-
-			TContainerIteratorSuperTest(const ContainerType& Container, uint32 CurrentIndex)
-				: IteratedContainer(const_cast<ContainerType&>(Container))
-				, SuperIt(ConstructionHelper<SuperIterator>::template Make<decltype(Container.GetSubContainerForIterator())>(Container.GetSubContainerForIterator(), CurrentIndex))
+				, SuperIt(Make<decltype(Container.GetDataRef())>(Container.GetDataRef(), CurrentIndex))
 			{
 			}
 
@@ -642,8 +675,10 @@ namespace UC /*UnrealContainers*/
 	//template<typename T> Iterators::TArrayIterator<T> begin(const TArray<T>& Array) { return Iterators::TArrayIterator<T>(Array, 0); }
 	//template<typename T> Iterators::TArrayIterator<T> end  (const TArray<T>& Array) { return Iterators::TArrayIterator<T>(Array, Array.Num()); }
 
+	//template<typename T> Iterators::TContainerIterator<TArray, T> begin(const TArray<T>& Array) { return Iterators::TContainerIterator<TArray, T>(Array, 0); }
+	//template<typename T> Iterators::TContainerIterator<TArray, T> end(const TArray<T>& Array)   { return Iterators::TContainerIterator<TArray, T>(Array, Array.Num()); }
 
-	template<typename T> Iterators::TContainerIterator<TArray, T> begin(const TArray<T>& Array) { return Iterators::TContainerIterator<TArray, T>(Array, 0); }
-	template<typename T> Iterators::TContainerIterator<TArray, T> end(const TArray<T>& Array)   { return Iterators::TContainerIterator<TArray, T>(Array, Array.Num()); }
+	template<typename T> Iterators::TArrayIterator<T> begin(const TArray<T>& Array) { return Iterators::TArrayIterator<T>(Array, 0); }
+	template<typename T> Iterators::TArrayIterator<T> end  (const TArray<T>& Array) { return Iterators::TArrayIterator<T>(Array, Array.Num()); }
 }
 

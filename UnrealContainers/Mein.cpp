@@ -32,9 +32,39 @@
 //	return false;
 //}
 
+namespace It = UC::Iterators;
+
+template<typename SuperIterator, typename DataStructureType>
+static SuperIterator Make(const DataStructureType& Container, int Index)
+{
+	if constexpr (!std::is_trivial_v<SuperIterator>) {
+		return SuperIterator(Container, Index);
+	}
+	else {
+		return Index;
+	}
+}
 
 void Main()
 {
+	UC::TSet<int> Set;
+	UC::TSparseArray<int> Array;
+
+	//It::TSetIterator<int> Sett(Set);
+	//It::TContainerIteratorSuperTest<It::TSparseArrayIterator<int>, UC::TSet, UC::SetElement<int>> someIt(Set);
+	//It::TContainerIteratorSuperTest<It::TSparseArrayIterator<int>, UC::TSet, UC::TSet<int>::DataType> someIt(Set);
+	//It::TContainerIteratorSuperTest<It::TContainerIteratorSuperTest<It::FSetBitIterator, UC::TSparseArray, UC::SetElement<int>>, UC::TSet, int> myIterator(Set);
+
+	It::TSetIterator<int> MySetIterator(Set);
+	It::TSetIterator<int> MySetIteratorEnd(Set, Set.Num());
+
+	//SuperIt(Make<decltype(Container.GetSubContainerForIterator())>(Container.GetSubContainerForIterator(), CurrentIndex))
+	//auto Type = Make<
+	//	It::TContainerIteratorSuperTest<It::FSetBitIterator, UC::TSparseArray, UC::SetElement<int>>, 
+	//	decltype(Set.GetSubContainerForIterator())
+	//>(Set.GetSubContainerForIterator(), 0);
+
+	
 	AllocConsole();
 	FILE* f;
 	freopen_s(&f, "CONIN$", "r", stdin);
@@ -59,25 +89,28 @@ void Main()
 
 	UC::TMap<float, int> map;
 
-	UC::Iterators::TContainerIterator<UC::TArray, float> myFill(MyFloatingArray);
-	UC::Iterators::TContainerIterator<UC::TArray, float, std::nullptr_t> myFilldf(MyFloatingArray);
+	It::TContainerIterator<UC::TArray, float> myFill(MyFloatingArray);
+	It::TContainerIterator<UC::TArray, float, std::nullptr_t> myFilldf(MyFloatingArray);
 
-	UC::Iterators::TContainerIterator<UC::TArray, float, std::nullptr_t>::DataType Value = { 5403.40f, nullptr };
+	It::TContainerIterator<UC::TArray, float, std::nullptr_t>::DataType Value = { 5403.40f, nullptr };
 
-	UC::Iterators::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeIt(MyFloatingArray);
-	UC::Iterators::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeEnd(MyFloatingArray, MyFloatingArray.Num());
+	It::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeIt(MyFloatingArray);
+	It::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeEnd(MyFloatingArray, MyFloatingArray.Num());
 
 	UC::TSparseArray<float> SparseTest;
 	UC::TSet<int> SetTest;
 
-	UC::Iterators::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseIt(SparseTest);
-	UC::Iterators::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseEnd(SparseTest, SparseTest.Num());
+	It::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseIt(SparseTest);
+	It::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseEnd(SparseTest, SparseTest.Num());
 
-	UC::Iterators::TSparseArrayIterator<float> Sparser(SparseTest);
-	UC::Iterators::TSetIterator<int> Sett(SetTest);
+	//It::TSparseArrayIterator<float> Sparser(SparseTest);
+	//It::TSetIterator<int> Sett(SetTest);
 
-	auto Value = *Sparser;
-	auto Value3 = *Sett;
+
+	
+
+	//auto Valuef = *Sparser;
+	//auto Value3 = *Sett;
 
 
 	for (; SomeIt != SomeEnd; ++SomeIt)
