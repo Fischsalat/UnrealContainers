@@ -29,19 +29,36 @@ namespace UC /*UnrealContainers*/
 		{
 			uint32 pos = 0;
 			if (Value >= 1 << 16) { Value >>= 16; pos += 16; }
-			if (Value >= 1 << 8) { Value >>= 8; pos += 8; }
-			if (Value >= 1 << 4) { Value >>= 4; pos += 4; }
-			if (Value >= 1 << 2) { Value >>= 2; pos += 2; }
-			if (Value >= 1 << 1) { pos += 1; }
+			if (Value >= 1 << 8)  { Value >>= 8; pos += 8; }
+			if (Value >= 1 << 4)  { Value >>= 4; pos += 4; }
+			if (Value >= 1 << 2)  { Value >>= 2; pos += 2; }
+			if (Value >= 1 << 1)  { pos += 1; }
 			return pos;
 		}
 
 		inline uint32 CountLeadingZeros(uint32 Value)
 		{
-			if (Value == 0) return 32;
+			if (Value == 0) 
+				return 32;
+
 			return 31 - FloorLog2(Value);
 		}
 	}
+
+	template<typename ArrayDataType>
+	class TArray;
+
+	template<typename SparseArrayDataType>
+	class TSparseArray;
+
+	template<typename SetDataType>
+	class TSet;
+
+	template<typename KeyType, typename ValueType>
+	class TMap;
+
+	template <typename KeyType, typename ValueType>
+	class TPair;
 
 	namespace Iterators
 	{
@@ -52,6 +69,19 @@ namespace UC /*UnrealContainers*/
 
 		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
 		class TContainerIteratorSuperTest;
+
+
+		template<typename ArrayType>
+		using TArrayIterator_WithTempNameChange = TContainerIteratorSuperTest<int32, TArray, ArrayType>;
+
+		template<typename SparseArrayType>
+		using TSparseArrayIterator = TContainerIteratorSuperTest<FSetBitIterator, TSparseArray, SparseArrayType>;
+
+		template<typename SetType>
+		using TSetIterator = TContainerIteratorSuperTest<TSparseArrayIterator<SetType>, TSet, SetType>;
+
+		template<typename KeyType, typename ValueType>
+		using TMapIterator = TContainerIteratorSuperTest<TSetIterator<TPair<KeyType, ValueType>>, TMap, KeyType, ValueType>;
 	}
 
 	template<typename ArrayDataType>
@@ -300,7 +330,7 @@ namespace UC /*UnrealContainers*/
 	private:
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
 
-		inline const FBitArray& GetSubContainerForIterator() const { return AllocationFlags; }
+		inline const auto& GetSubContainerForIterator() const { return AllocationFlags; }
 
 	public:
 		inline       SparseArrayDataType& operator[](int32 Index)       { VerifyIndex(Index); return *(SparseArrayDataType*)&Data.GetUnsafe(Index).ElementData; }
@@ -325,28 +355,41 @@ namespace UC /*UnrealContainers*/
 		}
 
 	public:
-		FORCEINLINE KeyType& Key()
+		inline KeyType& Key()
 		{
 			return First;
 		}
-		FORCEINLINE const KeyType& Key() const
+		inline const KeyType& Key() const
 		{
 			return First;
 		}
-		FORCEINLINE ValueType& Value()
+		inline ValueType& Value()
 		{
 			return Second;
 		}
-		FORCEINLINE const ValueType& Value() const
+		inline const ValueType& Value() const
 		{
 			return Second;
 		}
 	};
 
+	template<typename T>
+	class SetElement
+	{
+
+	};
+
 	template<typename SetDataType>
 	class TSet
 	{
+		using SetElementType = SetElement<SetDataType>;
 
+		TSparseArray<SetElementType> Elements;
+		TInlineAllocator<1>::ForElementType<int32> Hash;
+		int32 HashSize;
+
+	public: //debug
+		inline const auto& GetSubContainerForIterator() const { return Elements; }
 	};
 
 
@@ -579,37 +622,14 @@ namespace UC /*UnrealContainers*/
 			}
 
 		public:
-			//inline       DataType& operator*()       { return IteratedContainer[CurrentIndex]; }
-			//inline const DataType& operator*() const { return IteratedContainer[CurrentIndex]; }
+			inline int32 GetIndex() { if constexpr (!bIsTrivialSuperIt) { return SuperIt.GetIndex(); } else { return SuperIt; } }
 
-			inline DataType& operator*()
-			{
-				if constexpr (!bIsTrivialSuperIt)
-				{
-					return IteratedContainer[SuperIt.GetIndex()];
-				}
-				else
-				{
-					return IteratedContainer[SuperIt];
-				}
-			}
+		public:
+			inline       DataType& operator*()       { return IteratedContainer[GetIndex()]; }
+			inline const DataType& operator*() const { return IteratedContainer[GetIndex()]; }
 
-			inline int32 GetIndex()
-			{
-				if constexpr (!bIsTrivialSuperIt)
-				{
-					return SuperIt.GetIndex();
-				}
-				else
-				{
-					return SuperIt;
-				}
-			}
-
-			//inline const DataType& operator*() const { return IteratedContainer[CurrentIndex]; }
-
-			//inline       DataType* operator->()       { return &IteratedContainer[CurrentIndex]; }
-			//inline const DataType* operator->() const { return &IteratedContainer[CurrentIndex]; }
+			inline       DataType* operator->()       { return &IteratedContainer[GetIndex()]; }
+			inline const DataType* operator->() const { return &IteratedContainer[GetIndex()]; }
 
 			inline TContainerIteratorSuperTest& operator++() { ++SuperIt; return *this; }
 			inline TContainerIteratorSuperTest& operator--() { --SuperIt; return *this; }

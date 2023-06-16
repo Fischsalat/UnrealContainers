@@ -68,9 +68,17 @@ void Main()
 	UC::Iterators::TContainerIteratorSuperTest<UC::int32, UC::TArray, float> SomeEnd(MyFloatingArray, MyFloatingArray.Num());
 
 	UC::TSparseArray<float> SparseTest;
+	UC::TSet<int> SetTest;
 
 	UC::Iterators::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseIt(SparseTest);
 	UC::Iterators::TContainerIteratorSuperTest<UC::Iterators::FSetBitIterator, UC::TSparseArray, float> SomeSparseEnd(SparseTest, SparseTest.Num());
+
+	UC::Iterators::TSparseArrayIterator<float> Sparser(SparseTest);
+	UC::Iterators::TSetIterator<int> Sett(SetTest);
+
+	auto Value = *Sparser;
+	auto Value3 = *Sett;
+
 
 	for (; SomeIt != SomeEnd; ++SomeIt)
 	{
