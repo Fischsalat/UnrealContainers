@@ -6,15 +6,15 @@
 
 namespace UC /*UnrealContainers*/
 {
-	typedef __int8 int8;
-	typedef __int16 int16;
-	typedef __int32 int32;
-	typedef __int64 int64;
+	typedef int8_t int8;
+	typedef int16_t int16;
+	typedef int32_t int32;
+	typedef int64_t int64;
 
-	typedef unsigned __int8 uint8;
-	typedef unsigned __int16 uint16;
-	typedef unsigned __int32 uint32;
-	typedef unsigned __int64 uint64;
+	typedef uint8_t uint8;
+	typedef uint16_t uint16;
+	typedef uint32_t uint32;
+	typedef uint64_t uint64;
 
 	namespace FMemory
 	{
@@ -71,7 +71,7 @@ namespace UC /*UnrealContainers*/
 	{
 		class FSetBitIterator;
 
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 = void>
+		template<typename SuperIterator, template<typename...> class OuterType, typename... Types>
 		class TContainerIterator;
 
 
@@ -95,7 +95,7 @@ namespace UC /*UnrealContainers*/
 		using DataType = ArrayDataType;
 
 	private:
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2>
+		template<typename SuperIterator, template<typename...> class OuterType, typename... Types>
 		friend class Iterators::TContainerIterator;
 
 		template<typename SparseArrayDataType>
@@ -318,7 +318,7 @@ namespace UC /*UnrealContainers*/
 		using DataType = TSparseArrayElementOrFreeListLink<TAlignedBytes<sizeof(SparseArrayDataType), alignof(SparseArrayDataType)>>;
 
 	private:
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2>
+		template<typename SuperIterator, template<typename...> class OuterType, typename... Types>
 		friend class Iterators::TContainerIterator;
 
 	private:
@@ -394,7 +394,7 @@ namespace UC /*UnrealContainers*/
 		using DataType = SetElement<SetDataType>;
 
 	private:
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2>
+		template<typename SuperIterator, template<typename...> class OuterType, typename... Types>
 		friend class Iterators::TContainerIterator;
 
 	private:
@@ -434,7 +434,7 @@ namespace UC /*UnrealContainers*/
 		using DataType = TPair<KeyType, ValueType>;
 
 	private:
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2>
+		template<typename SuperIterator, template<typename...> class OuterType, typename... Types>
 		friend class Iterators::TContainerIterator;
 
 		using IteratorType = Iterators::TMapIterator<KeyType, ValueType>;
@@ -451,9 +451,9 @@ namespace UC /*UnrealContainers*/
 	public:
 		inline IteratorType Find(const KeyType& Key, bool(*Equals)(const KeyType& L, const KeyType& R))
 		{
-			for (auto It = begin(*this); It = end(*this); ++It)
+			for (auto It = begin(*this); It == end(*this); ++It)
 			{
-				if (Equals(It->Value(), Key))
+				if (Equals(It->Key(), Key))
 					return It;
 			}
 		}
@@ -462,8 +462,8 @@ namespace UC /*UnrealContainers*/
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
 
 	public:
-		inline       DataType& operator[] (int32 Index)       { return Elements[Index].Value; }
-		inline const DataType& operator[] (int32 Index) const { return Elements[Index].Value; }
+		inline       DataType& operator[] (int32 Index)       { return Elements[Index]; }
+		inline const DataType& operator[] (int32 Index) const { return Elements[Index]; }
 
 		inline bool operator==(const TMap<KeyType, ValueType>& Other) const { return Elements.operator==(Other.Elements); }
 		inline bool operator!=(const TMap<KeyType, ValueType>& Other) const { return Elements.operator!=(Other.Elements); }
@@ -572,12 +572,26 @@ namespace UC /*UnrealContainers*/
 		};
 
 
-		template<typename SuperIterator, template<typename...> class OuterType, typename T1, typename T2 /* = void */>
+		template<bool bWrapInOuter, template<typename...> class OuterType, typename... Types>
+		struct TypeSelector { };
+
+		template<template<typename...> class OuterType, typename T>
+		struct TypeSelector<false, OuterType, T> { using Type = T; };
+
+		template<template<typename...> class OuterType, typename T>
+		struct TypeSelector<true, OuterType, T> { using Type = OuterType<T>; };
+
+		template<bool bWrapInOuter, template<typename...> class OuterType, typename T1, typename T2>
+		struct TypeSelector<bWrapInOuter, OuterType, T1, T2> { using Type = OuterType<T1, T2>; };
+
+
+		template<typename SuperIterator, template<typename...> class OuterType, typename... Types>
 		class TContainerIterator
 		{
-		public:
-			using ContainerType = std::conditional_t<std::is_same_v<T2, void>, OuterType<T1>, OuterType<T1, T2>>; //OuterType<T1>;
-			using DataType = std::conditional_t<std::is_same_v<T2, void>, T1, TPair<T1, T2>>;
+		private:
+			//using ContainerType = OuterType<Types...>;
+			using DataType = TypeSelector<false, TPair, Types...>::template Type;
+			using ContainerType = TypeSelector<true, OuterType, Types...>::template Type;
 
 		private:
 			static constexpr bool bIsTrivialSuperIt = std::is_trivial_v<SuperIterator>;

@@ -45,39 +45,45 @@ void Main()
 
 	UC::TArray<float> MyFloatingArray;
 	const UC::TArray<float> MyOtherArray;
-
+	
 	if (MyFloatingArray != MyOtherArray)
 	{
 		for (float& Value : MyFloatingArray)
 		{
 			Value = 6.9f;
 		}
-
+	
 		for (float& Value : MyOtherArray)
 		{
 			Value = 9.6f;
 		}
 	}
-
+	
 	auto It = UC::begin(MyOtherArray);
-
+	
 	UC::TArray<float> MyArray;
 	UC::TSparseArray<float> MySparseArray;
 	UC::TSet<float> MySet;
 	UC::TMap<size_t, void*> MyMap;
-
+	
 	auto Itrator = MyMap.Find(30ull, [](auto L, auto R) { return L == R; });
+	
+	for (UC::TPair<size_t, void*>& Pair : MyMap)
+	{
+		std::cout << Pair.Value() << std::endl;
+		std::cout << Pair.Key() << std::endl;
+	}
 
 	for (float& FltRef : MyArray)
 	{
 		std::cout << FltRef << std::endl;
 	}
-
+	
 	for (float& FltRef : MySparseArray)
 	{
 		std::cout << FltRef << std::endl;
 	}
-
+	
 	for (float& FltRef : MySet)
 	{
 		std::cout << FltRef << std::endl;
@@ -87,7 +93,7 @@ void Main()
 	UC::FString StrInt(0x69);
 	UC::FString StrWChar0(L"Hell world!");
 	const UC::FString StrWChar1(L"Some world!");
-
+	
 	if (StrWChar0 != StrWChar1)
 	{
 		for (wchar_t Char : StrWChar0)
@@ -95,7 +101,7 @@ void Main()
 			std::wcout << Char << L", ";
 		}
 	}
-
+	
 	for (int i = 0; i < StrWChar0.Num(); i++)
 	{
 		std::wcout << StrWChar0[i] << L", ";
