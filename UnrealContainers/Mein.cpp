@@ -61,7 +61,22 @@ void Main()
 
 	auto It = UC::begin(MyOtherArray);
 
+	UC::TArray<float> MyArray;
+	UC::TSparseArray<float> MySparseArray;
 	UC::TSet<float> MySet;
+	UC::TMap<size_t, void*> MyMap;
+
+	auto Itrator = MyMap.Find(30ull, [](auto L, auto R) { return L == R; });
+
+	for (float& FltRef : MyArray)
+	{
+		std::cout << FltRef << std::endl;
+	}
+
+	for (float& FltRef : MySparseArray)
+	{
+		std::cout << FltRef << std::endl;
+	}
 
 	for (float& FltRef : MySet)
 	{
