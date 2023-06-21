@@ -1,6 +1,9 @@
 // Copyright 1998-2023 Epic Games, Inc. All Rights Reserved.
 
 #pragma once
+#include <stdexcept>
+#include <cstdint>
+#include <cstring>
 #include <string>
 
 
@@ -88,6 +91,29 @@ namespace UC /*UnrealContainers*/
 		using TMapIterator = TContainerIterator<TSetIterator<typename TMap<KeyType, ValueType>::DataType>, TMap, KeyType, ValueType>;
 	}
 
+
+	template <typename KeyType, typename ValueType>
+	class TPair
+	{
+	private:
+		KeyType First;
+		ValueType Second;
+
+	public:
+		TPair(KeyType Key, ValueType Value)
+			: First(Key)
+			, Second(Value)
+		{
+		}
+
+	public:
+		inline       KeyType& Key() { return First; }
+		inline const KeyType& Key() const { return First; }
+
+		inline       ValueType& Value() { return Second; }
+		inline const ValueType& Value() const { return Second; }
+	};
+
 	template<typename ArrayDataType>
 	class TArray
 	{
@@ -126,6 +152,8 @@ namespace UC /*UnrealContainers*/
 		inline int32 Max() const { return NumElements; }
 
 		inline bool IsValidIndex(int32 Index) const { return Data && Index > 0 && Index < NumElements; }
+
+		inline bool IsValid() const { return Data && NumElements > 0 && MaxElements > 0; }
 
 	public:
 		inline void Free() 
@@ -240,6 +268,7 @@ namespace UC /*UnrealContainers*/
 		inline bool operator!=(const FString& Other) const { return Other ? wcscmp(Data, Other.Data) != 0 : true;  }
 	};
 
+
 	template<int32 Size, uint32 Alignment>
 	struct TAlignedBytes
 	{
@@ -284,6 +313,8 @@ namespace UC /*UnrealContainers*/
 		inline uint32* GetData() const { return (uint32*)Data.GetAllocation(); }
 
 		inline bool IsValidIndex(int32 Index) const { return Index > 0 && Index < NumBits; }
+
+		inline bool IsValid() const { return GetData() && NumBits > 0; }
 
 	private:
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
@@ -333,9 +364,10 @@ namespace UC /*UnrealContainers*/
 
 		inline bool IsValidIndex(int32 Index) const { return Data.IsValidIndex(Index) && AllocationFlags[Index]; }
 
+		inline bool IsValid() const { return Data.IsValid() && AllocationFlags.IsValid(); }
+
 	private:
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
-
 
 	public:
 		inline       SparseArrayDataType& operator[](int32 Index)       { VerifyIndex(Index); return *(SparseArrayDataType*)&Data.GetUnsafe(Index).ElementData; }
@@ -352,27 +384,6 @@ namespace UC /*UnrealContainers*/
 		inline const auto& GetDataRef() const { return AllocationFlags; }
 	};
 
-	template <typename KeyType, typename ValueType>
-	class TPair
-	{
-	private:
-		KeyType First;
-		ValueType Second;
-
-	public:
-		TPair(KeyType Key, ValueType Value)
-			: First(Key)
-			, Second(Value)
-		{
-		}
-
-	public:
-		inline       KeyType& Key()       { return First; }
-		inline const KeyType& Key() const { return First; }
-
-		inline       ValueType& Value()       { return Second; }
-		inline const ValueType& Value() const { return Second; }
-	};
 
 	template<typename T>
 	class SetElement
@@ -403,10 +414,12 @@ namespace UC /*UnrealContainers*/
 		int32 HashSize;
 
 	public:
-		inline bool IsValidIndex(int32 Index) const { return Elements.IsValidIndex(Index); }
-
 		inline int32 Num() const { return Elements.Num(); }
 		inline int32 Max() const { return Elements.Max(); }
+
+		inline bool IsValidIndex(int32 Index) const { return Elements.IsValidIndex(Index); }
+
+		inline bool IsValid() const { return Elements.IsValid(); }
 
 	private:
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
@@ -437,25 +450,27 @@ namespace UC /*UnrealContainers*/
 		template<typename SuperIterator, template<typename...> class OuterType, typename... Types>
 		friend class Iterators::TContainerIterator;
 
-		using IteratorType = Iterators::TMapIterator<KeyType, ValueType>;
-
 	private:
 		TSet<DataType> Elements;
 
 	public:
-		inline bool IsValidIndex(int32 Index) const { return Elements.IsValidIndex(Index); }
-
 		inline int32 Num() const { return Elements.Num(); }
 		inline int32 Max() const { return Elements.Max(); }
 
+		inline bool IsValidIndex(int32 Index) const { return Elements.IsValidIndex(Index); }
+
+		inline bool IsValid() const { return Elements.IsValid(); }
+
 	public:
-		inline IteratorType Find(const KeyType& Key, bool(*Equals)(const KeyType& L, const KeyType& R))
+		inline decltype(auto) Find(const KeyType& Key, bool(*Equals)(const KeyType& L, const KeyType& R))
 		{
-			for (auto It = begin(*this); It == end(*this); ++It)
+			for (auto It = begin(*this); It != end(*this); ++It)
 			{
 				if (Equals(It->Key(), Key))
 					return It;
 			}
+
+			return end(*this);
 		}
 
 	private:
@@ -519,10 +534,8 @@ namespace UC /*UnrealContainers*/
 		public:
 			inline FSetBitIterator& operator++()
 			{
-				// Mark the current bit as visited.
 				UnvisitedBitMask &= ~this->Mask;
 
-				// Find the first set bit that hasn't been visited yet.
 				FindFirstSetBit();
 
 				return *this;
@@ -542,7 +555,6 @@ namespace UC /*UnrealContainers*/
 				const int32   ArrayNum = Array.Num();
 				const int32   LastWordIndex = (ArrayNum - 1) / NumBitsPerDWORD;
 
-				// Advance to the next non-zero uint32.
 				uint32 RemainingBitMask = ArrayData[this->WordIndex] & UnvisitedBitMask;
 				while (!RemainingBitMask)
 				{
@@ -550,7 +562,6 @@ namespace UC /*UnrealContainers*/
 					BaseBitIndex += NumBitsPerDWORD;
 					if (this->WordIndex > LastWordIndex)
 					{
-						// We've advanced past the end of the array.
 						CurrentBitIndex = ArrayNum;
 						return;
 					}
@@ -567,7 +578,6 @@ namespace UC /*UnrealContainers*/
 
 				if (CurrentBitIndex > ArrayNum)
 					CurrentBitIndex = ArrayNum;
-
 			}
 		};
 
@@ -589,9 +599,9 @@ namespace UC /*UnrealContainers*/
 		class TContainerIterator
 		{
 		private:
-			//using ContainerType = OuterType<Types...>;
-			using DataType = TypeSelector<false, TPair, Types...>::template Type;
-			using ContainerType = TypeSelector<true, OuterType, Types...>::template Type;
+			using OwnType = TContainerIterator<SuperIterator, OuterType, Types...>;
+			using DataType = typename TypeSelector<false, TPair, Types...>::Type;
+			using ContainerType = typename TypeSelector<true, OuterType, Types...>::Type;
 
 		private:
 			static constexpr bool bIsTrivialSuperIt = std::is_trivial_v<SuperIterator>;

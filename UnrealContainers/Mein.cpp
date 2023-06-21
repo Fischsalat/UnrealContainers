@@ -58,6 +58,32 @@ void Main()
 			Value = 9.6f;
 		}
 	}
+
+	UC::TMap<UC::FString, void*>& PluginStateMachines = *(UC::TMap<UC::FString, void*>*)(0);
+
+	for (auto It = UC::begin(PluginStateMachines); It != UC::end(PluginStateMachines); ++It)
+	{
+		std::cout << "Key: " << It->Key().ToString() << std::endl;
+	}
+
+	auto FoundIt = PluginStateMachines.Find(L"this is a key", [](auto L, auto R) { return L == R; });
+
+	static_assert(std::is_same_v<decltype(FoundIt), decltype(UC::end(PluginStateMachines))>, "Not same type!");
+
+
+	if (FoundIt != UC::end(PluginStateMachines))
+		FoundIt->Key() = L"Hell!";
+
+	if (FoundIt != UC::begin(PluginStateMachines)) 
+		FoundIt->Key() = L"Heaven!";
+
+	if (FoundIt.GetIndex() == 40)
+		++FoundIt;
+
+	for (auto& Pair : PluginStateMachines)
+	{
+		std::cout << "Key: " << Pair.Key().ToString() << std::endl;
+	}
 	
 	auto It = UC::begin(MyOtherArray);
 	
