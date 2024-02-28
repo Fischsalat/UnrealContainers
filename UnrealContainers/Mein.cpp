@@ -5,6 +5,9 @@
 //#include "Containers.h"
 
 //#include "ContainersRewrite.h"
+
+#define WITH_ALLOCATOR 0
+
 #include "ContainersRewrite.h"
 
 //using namespace UE;
@@ -58,6 +61,8 @@ void Main()
 			Value = 9.6f;
 		}
 	}
+
+	//UC::FMemory::Init((void*)39);
 
 	UC::TMap<UC::FString, void*>& PluginStateMachines = *(UC::TMap<UC::FString, void*>*)(0);
 

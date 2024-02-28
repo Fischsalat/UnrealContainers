@@ -2,13 +2,20 @@
 
 #pragma once
 #include <stdexcept>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <string>
 
+#include <unordered_set>
+
 
 namespace UC /*UnrealContainers*/
 {
+	constexpr bool bUseEngineAllocation = false;
+
+	constexpr bool bFoolproofTArrayFree = true;
+
 	typedef int8_t int8;
 	typedef int16_t int16;
 	typedef int32_t int32;
@@ -21,15 +28,49 @@ namespace UC /*UnrealContainers*/
 
 	namespace FMemory
 	{
-		inline void* (*Malloc)(int32 Size, int32 Alignment) = nullptr;
-		inline void* (*Realloc)(void* Memory, int64 NewSize, uint32 Alignment) = nullptr; // nullptr safe
-		inline void  (*Free)(void* Memory) = nullptr; // nullptr safe
+		inline void* (*Realloc_Internal)(void* Memory, uint64 NewSize, uint32 Alignment) = nullptr;
 
-		inline void Init(void* M, void* R, void* F)
+		template<typename = std::enable_if_t<bUseEngineAllocation, bool>>
+		inline void Init(void* R)
 		{
-			Malloc = reinterpret_cast<decltype(Malloc)>(M);
-			Realloc = reinterpret_cast<decltype(Realloc)>(R);
-			Free = reinterpret_cast<decltype(Free)>(F);
+			Realloc_Internal = reinterpret_cast<decltype(Realloc_Internal)>(R);
+		}
+
+		inline void* Malloc(int32 Size, int32 Alignment = 0x0 /*auto*/)
+		{
+			if constexpr (bUseEngineAllocation)
+			{
+				assert(Realloc_Internal != nullptr && "Realloc_Internal was nullptr, initialize it or set UC::bUseEngineAllocation = false");
+
+				return Realloc_Internal(nullptr, Size, Alignment);
+			}
+
+			return malloc(Size);
+		}
+
+		inline void* Realloc(void* Ptr, uint64 Size, uint32 Alignment = 0x0 /*auto*/)
+		{
+			if constexpr (bUseEngineAllocation)
+			{
+				assert(Realloc_Internal != nullptr && "Realloc_Internal was nullptr, initialize it or set UC::bUseEngineAllocation = false");
+
+				return Realloc_Internal(Ptr, Size, Alignment);
+			}
+
+			return realloc(Ptr, Size);
+			
+		}
+
+		inline void Free(void* Ptr)
+		{
+			if constexpr (bUseEngineAllocation)
+			{
+				assert(Realloc_Internal != nullptr && "Realloc_Internal was nullptr, initialize it or set UC::bUseEngineAllocation = false");
+
+				Realloc_Internal(Ptr, 0x0, 0x0);
+			}
+			
+			return free(Ptr);
 		}
 	}
 
@@ -107,10 +148,10 @@ namespace UC /*UnrealContainers*/
 		}
 
 	public:
-		inline       KeyType& Key() { return First; }
+		inline       KeyType& Key()       { return First; }
 		inline const KeyType& Key() const { return First; }
 
-		inline       ValueType& Value() { return Second; }
+		inline       ValueType& Value()       { return Second; }
 		inline const ValueType& Value() const { return Second; }
 	};
 
@@ -131,6 +172,9 @@ namespace UC /*UnrealContainers*/
 		static constexpr int32 TypeSize = sizeof(DataType);
 		static constexpr int32 TypeAlign = alignof(DataType);
 
+	private:
+		static inline std::unordered_set<void*> ArraysToFree;
+
 	protected:
 		ArrayDataType* Data;
 		int32 NumElements;
@@ -140,12 +184,69 @@ namespace UC /*UnrealContainers*/
 		TArray()
 			: Data(nullptr), NumElements(0), MaxElements(0)
 		{
+			if constexpr (bFoolproofTArrayFree)
+				ArraysToFree.insert(this);
 		}
 
 		TArray(uint32 InitSize)
 			: Data((ArrayDataType*)FMemory::Malloc(InitSize * TypeSize, TypeAlign)), NumElements(0), MaxElements(InitSize)
 		{
+			if constexpr (bFoolproofTArrayFree && bUseEngineAllocation)
+			{
+				std::cout << "TArray(uint32): ArraysToFree.insert(" << this << ")" << std::endl;
+				ArraysToFree.insert(this);
+			}
 		}
+
+		TArray(TArray&& Other) noexcept
+		{
+			if (this == &Other)
+				return;
+
+			if constexpr (bFoolproofTArrayFree)
+			{
+				std::cout << "TArray(TArray&&): ArraysToFree.erase(" << &Other << ")" << std::endl;
+				std::cout << "TArray(TArray&&): ArraysToFree.insert(" << this << ")" << std::endl;
+				ArraysToFree.erase(&Other);
+				ArraysToFree.insert(this);
+			}
+
+			Data = Other.Data;
+			NumElements = Other.NumElements;
+			MaxElements = Other.MaxElements;
+
+			Other.Data = nullptr;
+			Other.NumElements = 0;
+			Other.MaxElements = 0;
+
+			return *this;
+		}
+
+		TArray(const TArray& Other)
+		{
+			if (this == &Other)
+				return;
+
+			Data = Other.Data;
+			NumElements = Other.NumElements;
+			MaxElements = Other.MaxElements;
+		}
+
+		~TArray()
+		{
+			if constexpr (bFoolproofTArrayFree)
+			{
+				if (ArraysToFree.erase(this) > 0)
+				{
+					std::cout << "~TArray()" << std::endl;
+					FMemory::Free(Data);
+				}
+			}
+		}
+
+	public:
+		TArray& operator=(TArray&&) = default;
+		TArray& operator=(const TArray&) = default;
 
 	public:
 		inline int32 Num() const { return NumElements; }
@@ -220,12 +321,7 @@ namespace UC /*UnrealContainers*/
 	class FString : public TArray<wchar_t>
 	{
 	public:
-		FString() = default;
-
-		FString(uint32 InitSize)
-			: TArray(InitSize)
-		{
-		}
+		using TArray::TArray;
 
 		FString(const wchar_t* Str)
 		{
@@ -412,6 +508,26 @@ namespace UC /*UnrealContainers*/
 		TSparseArray<DataType> Elements;
 		TInlineAllocator<1>::ForElementType<int32> Hash;
 		int32 HashSize;
+
+		constexpr void fun()
+		{
+			constexpr int z = sizeof(TArray<int>); // 0x10
+
+			constexpr int _a = sizeof(TInlineAllocator<4>::ForElementType<int32>);
+			constexpr int _b = sizeof(int32);
+			constexpr int _c = sizeof(int32);
+
+			constexpr int a = sizeof(FBitArray); // 0x20
+			constexpr int b = alignof(FBitArray); // 0x8
+
+			constexpr int c = sizeof(TSparseArray<int>); // -> 0x38
+
+			constexpr int d = sizeof(TInlineAllocator<1>::ForElementType<int32>); // 0x10
+			
+			constexpr int e = sizeof(int32); // 0x4 -> + 0x4 Pad
+
+			constexpr int f = sizeof(TSet<int>); // -> 0x50
+		}
 
 	public:
 		inline int32 Num() const { return Elements.Num(); }
@@ -649,7 +765,7 @@ namespace UC /*UnrealContainers*/
 	}
 
 	Iterators::FSetBitIterator begin(const FBitArray& Array) { return Iterators::FSetBitIterator(Array, 0); }
-	Iterators::FSetBitIterator end(const FBitArray& Array) { return Iterators::FSetBitIterator(Array, Array.Num()); }
+	Iterators::FSetBitIterator end  (const FBitArray& Array) { return Iterators::FSetBitIterator(Array, Array.Num()); }
 
 	template<typename T> Iterators::TArrayIterator<T> begin(const TArray<T>& Array) { return Iterators::TArrayIterator<T>(Array, 0); }
 	template<typename T> Iterators::TArrayIterator<T> end  (const TArray<T>& Array) { return Iterators::TArrayIterator<T>(Array, Array.Num()); }
@@ -662,6 +778,10 @@ namespace UC /*UnrealContainers*/
 
 	template<typename T0, typename T1> Iterators::TMapIterator<T0, T1> begin(const TMap<T0, T1>& Map) { return Iterators::TMapIterator<T0, T1>(Map, 0); }
 	template<typename T0, typename T1> Iterators::TMapIterator<T0, T1> end  (const TMap<T0, T1>& Map) { return Iterators::TMapIterator<T0, T1>(Map, Map.Num()); }
+
+	static_assert(sizeof(TArray<int32>) == 0x10, "TArray has a wrong size!");
+	static_assert(sizeof(TSet<int32>) == 0x50, "TSet has a wrong size!");
+	static_assert(sizeof(TMap<int32, int32>) == 0x50, "TMap has a wrong size!");
 }
 
 
