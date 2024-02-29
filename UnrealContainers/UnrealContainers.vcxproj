@@ -146,6 +146,7 @@
     <ClInclude Include="CLASSES_FOR_TESTING.h" />
     <ClInclude Include="Containers.h" />
     <ClInclude Include="ContainersRewrite.h" />
+    <ClInclude Include="UnrealContainers.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Mein.cpp" />

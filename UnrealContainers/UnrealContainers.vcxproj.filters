@@ -24,6 +24,9 @@
     <ClInclude Include="ContainersRewrite.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="UnrealContainers.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Mein.cpp">

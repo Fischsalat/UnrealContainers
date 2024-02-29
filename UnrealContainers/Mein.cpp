@@ -8,10 +8,11 @@
 
 #define WITH_ALLOCATOR 0
 
-#include "ContainersRewrite.h"
+//#include "ContainersRewrite.h"
 
 //using namespace UE;
 
+#include "UnrealContainers.h"
 
 #define PRINTBOOL(b) std::cout << (b ? "true\n" : "false\n")
 
@@ -35,7 +36,7 @@
 //	return false;
 //}
 
-namespace It = UC::Iterators;
+//namespace It = UC::Iterators;
 
 
 void Main()
@@ -46,6 +47,22 @@ void Main()
 	freopen_s(&f, "CONOUT$", "w", stdout);
 	freopen_s(&f, "CONOUT$", "w", stderr);
 
+	UC::TArray<int> MyArray(3);
+
+	UC::TArray<int>& MyOtherArrayRef = MyArray;
+	UC::TArray<int> MyOtherArrayClone = MyArray.Clone();
+
+	UC::TArray<int> MyOtherArray;
+	MyOtherArray = MyArray.Clone();
+
+	UC::FString SomeStr = L"Hell world...";
+
+	UC::FString MyNewString(0x10);
+	MyNewString = SomeStr.Clone();
+
+	using Type = std::decay_t<const UC::FString&>;
+
+	/*
 	UC::TArray<float> MyFloatingArray;
 	const UC::TArray<float> MyOtherArray;
 	
@@ -137,6 +154,7 @@ void Main()
 	{
 		std::wcout << StrWChar0[i] << L", ";
 	}
+	*/
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
