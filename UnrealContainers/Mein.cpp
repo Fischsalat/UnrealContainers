@@ -62,6 +62,11 @@ void Main()
 
 	using Type = std::decay_t<const UC::FString&>;
 
+	UC::TMap<float, UC::uint64> MapyMap;
+	UC::TMap<float, UC::uint64> Map2;
+
+	MapyMap = std::move(Map2);
+
 	/*
 	UC::TArray<float> MyFloatingArray;
 	const UC::TArray<float> MyOtherArray;

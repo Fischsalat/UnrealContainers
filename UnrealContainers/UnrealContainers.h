@@ -69,13 +69,14 @@ namespace UC
 		{
 		private:
 			static constexpr int32 TypeSize = sizeof(ContainerType);
+			static constexpr int32 TypeAlign = alignof(ContainerType);
 
 		public:
 			TCloneImpl() = delete;
 			TCloneImpl& operator=(const TCloneImpl&) = delete;
 
 		private:
-			uint8 ElementBuffer[TypeSize];
+			alignas(TypeAlign) uint8 ElementBuffer[TypeSize];
 
 		public:
 			inline operator ContainerType&&()
@@ -101,12 +102,60 @@ namespace UC
 				static constexpr int32 ElementSize = sizeof(ElementType);
 				static constexpr int32 ElementAlign = alignof(ElementType);
 
-			public:
-				inline ElementType* GetAllocation() const { return SecondaryData ? SecondaryData : (ElementType*)InlineData; }
-
 			private:
 				TAlignedBytes<ElementSize, ElementAlign> InlineData[NumInlineElements];
 				ElementType* SecondaryData;
+
+			public:
+				ForElementType()
+					: InlineData{ 0x0 }, SecondaryData(nullptr)
+				{
+				}
+
+				ForElementType(ForElementType&& Other)
+					: SecondaryData(Other.SecondaryData)
+				{
+					memcpy(InlineData, Other.InlineData, sizeof(InlineData));
+
+					Other.SecondaryData = nullptr;
+					/* Maybe set InlineData to zero */
+				}
+
+				~ForElementType()
+				{
+					Free();
+				}
+
+			public:
+				ForElementType& operator=(ForElementType&& Other) noexcept
+				{
+					if (this == &Other)
+						return *this;
+
+					Free();
+
+					SecondaryData = Other.SecondaryData;
+					memcpy(InlineData, Other.InlineData, sizeof(InlineData));
+
+					Other.SecondaryData = nullptr;
+					/* Maybe set InlineData to zero */
+
+					return *this;
+				}
+
+			public:
+				inline void Free()
+				{
+					if (SecondaryData)
+						FMemory::Free(SecondaryData);
+
+					memset(InlineData, 0x0, sizeof(InlineData));
+				}
+
+			public:
+				inline const ElementType* GetAllocation() const { return SecondaryData ? SecondaryData : reinterpret_cast<const ElementType*>(&InlineData); }
+
+				inline uint32 GetNumInlineBytes() const { return NumInlineElements; }
 			};
 		};
 
@@ -122,17 +171,29 @@ namespace UC
 			int32 MaxBits;
 
 		public:
+			FBitArray()
+				: NumBits(0), MaxBits(Data.GetNumInlineBytes() * NumBitsPerDWORD)
+			{
+			}
+
+		public:
+			FBitArray& operator=(FBitArray&&) = default;
+
+			/* BitArrays should never actively be deep-copied with this operator */
+			FBitArray& operator=(const FBitArray&) = delete;
+
+		private:
+			inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
+
+		public:
 			inline int32 Num() const { return NumBits; }
 			inline int32 Max() const { return MaxBits; }
 
-			inline uint32* GetData() const { return (uint32*)Data.GetAllocation(); }
+			inline const uint32* GetData() const { return reinterpret_cast<const uint32*>(Data.GetAllocation()); }
 
 			inline bool IsValidIndex(int32 Index) const { return Index > 0 && Index < NumBits; }
 
 			inline bool IsValid() const { return GetData() && NumBits > 0; }
-
-		private:
-			inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
 
 		public:
 			inline bool operator[](int32 Index) const { VerifyIndex(Index); return GetData()[Index / NumBitsPerDWORD] & (1 << (Index & (NumBitsPerDWORD - 1))); }
@@ -141,8 +202,8 @@ namespace UC
 			inline bool operator!=(const FBitArray& Other) const { return NumBits != Other.NumBits || GetData() != Other.GetData(); }
 
 		public:
-			friend Iterators::FSetBitIterator begin(const FBitArray& Array);
-			friend Iterators::FSetBitIterator end(const FBitArray& Array);
+			//friend Iterators::FSetBitIterator begin(const FBitArray& Array);
+			//friend Iterators::FSetBitIterator end(const FBitArray& Array);
 		};
 
 		template<typename SparseArrayType>
@@ -403,6 +464,16 @@ namespace UC
 		int32 NumFreeIndices;
 
 	public:
+		TSparseArray()
+			: FirstFreeIndex(-1), NumFreeIndices(0)
+		{
+		}
+
+		TSparseArray(TSparseArray&& Other) = default;
+
+	public:
+		TSparseArray& operator=(TSparseArray&&) = default;
+
 		/* Use 'TSparseArray<Type>& MyRef = OtherArray;' by default. If you want to copy this array use the 'Clone()' function */
 		TSparseArray& operator=(const TSparseArray&) = delete;
 
@@ -421,8 +492,8 @@ namespace UC
 		inline       SparseArrayElementType& operator[](int32 Index)       { VerifyIndex(Index); return *reinterpret_cast<SparseArrayElementType*>(&Data.GetUnsafe(Index).ElementData); }
 		inline const SparseArrayElementType& operator[](int32 Index) const { VerifyIndex(Index); return *reinterpret_cast<SparseArrayElementType*>(&Data.GetUnsafe(Index).ElementData); }
 
-		inline bool operator==(const TSparseArray<SparseArrayDataType>& Other) const { return Data == Other.Data; }
-		inline bool operator!=(const TSparseArray<SparseArrayDataType>& Other) const { return Data != Other.Data; }
+		inline bool operator==(const TSparseArray<SparseArrayElementType>& Other) const { return Data == Other.Data; }
+		inline bool operator!=(const TSparseArray<SparseArrayElementType>& Other) const { return Data != Other.Data; }
 
 	public:
 		//template<typename T> friend Iterators::TSparseArrayIterator<T> begin(const TSparseArray& Array);
@@ -437,7 +508,7 @@ namespace UC
 		static constexpr uint32 ElementSize = sizeof(SetElementType);
 
 	private:
-		using SetDataType = ContainerImpl::SetElement<SetDataType>;
+		using SetDataType = ContainerImpl::SetElement<SetElementType>;
 		using HashType = ContainerImpl::TInlineAllocator<1>::ForElementType<int32>;
 
 	private:
@@ -489,16 +560,16 @@ namespace UC
 		inline bool IsValid() const { return Elements.IsValid(); }
 
 	public:
-		inline decltype(auto) Find(const KeyElementType& Key, bool(*Equals)(const KeyElementType& Key, const ValueElementType& Value))
-		{
-			for (auto It = begin(*this); It != end(*this); ++It)
-			{
-				if (Equals(It->Key(), Key))
-					return It;
-			}
-
-			return end(*this);
-		}
+		//inline decltype(auto) Find(const KeyElementType& Key, bool(*Equals)(const KeyElementType& Key, const ValueElementType& Value))
+		//{
+		//	for (auto It = begin(*this); It != end(*this); ++It)
+		//	{
+		//		if (Equals(It->Key(), Key))
+		//			return It;
+		//	}
+		//
+		//	return end(*this);
+		//}
 
 	public:
 		inline       ElementType& operator[] (int32 Index)       { return Elements[Index]; }
