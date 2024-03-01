@@ -2,11 +2,12 @@
 #include <Windows.h>
 #include <iostream>
 #include <format>
+#include "Utils.h"
 //#include "Containers.h"
 
 //#include "ContainersRewrite.h"
 
-#define WITH_ALLOCATOR 0
+//#define WITH_ALLOCATOR 0
 
 //#include "ContainersRewrite.h"
 
@@ -39,34 +40,58 @@
 //namespace It = UC::Iterators;
 
 
-void Main()
-{	
+DWORD MainThread(HMODULE Module)
+{
 	AllocConsole();
 	FILE* f;
 	freopen_s(&f, "CONIN$", "r", stdin);
 	freopen_s(&f, "CONOUT$", "w", stdout);
 	freopen_s(&f, "CONOUT$", "w", stderr);
 
-	UC::TArray<int> MyArray(3);
+	/* Sig is only good for a few versions, not universal */
+	UC::FMemory::Init(FindPattern("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B F1 41 8B D8 48 8B 0D ? ? ? ? 48 8B FA 48 85 C9 75 ? E8"));
 
-	UC::TArray<int>& MyOtherArrayRef = MyArray;
-	UC::TArray<int> MyOtherArrayClone = MyArray.Clone();
+	{
+		UC::TArray<int> MyArray(3);
 
-	UC::TArray<int> MyOtherArray;
-	MyOtherArray = MyArray.Clone();
+		UC::TArray<int>& MyOtherArrayRef = MyArray;
+		UC::TArray<int> MyOtherArrayClone = MyArray.Clone();
 
-	UC::FString SomeStr = L"Hell world...";
+		UC::TArray<int> MyOtherArray(0x1);
+		MyOtherArray = MyArray.Clone();
 
-	UC::FString MyNewString(0x10);
-	MyNewString = SomeStr.Clone();
+		UC::FString SomeStr = L"Hell world...";
 
-	using Type = std::decay_t<const UC::FString&>;
+		UC::FString MyNewString(0x10);
+		MyNewString = SomeStr.Clone();
 
-	UC::TMap<float, UC::uint64> MapyMap;
-	UC::TMap<float, UC::uint64> Map2;
+		using Type = std::decay_t<const UC::FString&>;
 
-	MapyMap = std::move(Map2);
+		UC::TMap<float, UC::uint64> MapyMap;
+		UC::TMap<float, UC::uint64> Map2;
 
+		MapyMap = std::move(Map2);
+
+		for (const UC::TPair<float, UC::uint64>& Pair : MapyMap)
+		{
+			std::wcout << "Look at my value: " << Pair.Value() << std::endl;
+		}
+
+		for (wchar_t C : SomeStr)
+		{
+			std::wcout << C << "- ";
+		}
+		std::wcout << std::endl;
+
+		UC::FString SomeClonedString = SomeStr.Clone();
+		for (wchar_t C : SomeClonedString)
+		{
+			std::wcout << C << "+";
+		}
+		std::wcout << std::endl;
+	}
+
+	std::cout << std::endl;
 	/*
 	UC::TArray<float> MyFloatingArray;
 	const UC::TArray<float> MyOtherArray;
@@ -160,6 +185,22 @@ void Main()
 		std::wcout << StrWChar0[i] << L", ";
 	}
 	*/
+
+	while (true)
+	{
+		if (GetAsyncKeyState(VK_F6) & 1)
+		{
+			fclose(stdout);
+			if (f) fclose(f);
+			FreeConsole();
+
+			FreeLibraryAndExitThread(Module, 0);
+		}
+
+		Sleep(100);
+	}
+
+	return 0;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
@@ -170,7 +211,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH: {
-		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Main, 0, 0, 0);
+		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)MainThread, hModule, 0, 0);
 		break;
 	}
 	case DLL_PROCESS_DETACH: {
