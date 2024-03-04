@@ -17,6 +17,8 @@ namespace UC
 	{
 		inline void* (*EngineRealloc)(void* Block, uint64 NewSize, uint32 Alignment) = nullptr;
 
+		inline int32 AllocCount = 0x0;
+
 		inline void Init(void* ReallocAddress)
 		{
 			if (EngineRealloc == nullptr) [[unlikely]]
@@ -25,16 +27,26 @@ namespace UC
 
 		inline void* Malloc(uint64 Size, uint32 Alignment = 0x0 /* auto */)
 		{
+			std::cout << " + AllocCount now: 0x" << std::hex << ++AllocCount << std::endl;
+
 			return EngineRealloc(nullptr, Size, Alignment);
 		}
 
 		inline void* Realloc(void* Ptr, uint64 Size, uint32 Alignment = 0x0 /* auto */)
 		{
+			if (!Ptr)
+				std::cout << " + AllocCount now: 0x" << std::hex << ++AllocCount << std::endl;
+
+			if (Size == 0x0)
+				std::cout << " - AllocCount now: 0x" << std::hex << --AllocCount << std::endl;
+
 			return EngineRealloc(Ptr, Size, Alignment);
 		}
 
 		inline void Free(void* Ptr)
 		{
+			std::cout << " - AllocCount now: 0x" << std::hex << --AllocCount << std::endl;
+
 			EngineRealloc(Ptr, 0x0, 0x0);
 		}
 	}
@@ -117,6 +129,8 @@ namespace UC
 				static constexpr int32 ElementSize = sizeof(ElementType);
 				static constexpr int32 ElementAlign = alignof(ElementType);
 
+				static constexpr int32 InlineDataSizeBytes = NumInlineElements * ElementSize;
+
 			private:
 				TAlignedBytes<ElementSize, ElementAlign> InlineData[NumInlineElements];
 				ElementType* SecondaryData;
@@ -128,12 +142,9 @@ namespace UC
 				}
 
 				ForElementType(ForElementType&& Other)
-					: SecondaryData(Other.SecondaryData)
+					: InlineData{ 0x0 }, SecondaryData(nullptr)
 				{
-					memcpy(InlineData, Other.InlineData, sizeof(InlineData));
-
-					Other.SecondaryData = nullptr;
-					/* Maybe set InlineData to zero */
+					MoveFrom(std::move(Other));
 				}
 
 				~ForElementType()
@@ -144,27 +155,70 @@ namespace UC
 			public:
 				ForElementType& operator=(ForElementType&& Other) noexcept
 				{
-					if (this == &Other)
-						return *this;
-
-					Free();
-
-					SecondaryData = Other.SecondaryData;
-					memcpy(InlineData, Other.InlineData, sizeof(InlineData));
-
-					Other.SecondaryData = nullptr;
-					/* Maybe set InlineData to zero */
+					MoveFrom(std::move(Other));
 
 					return *this;
 				}
 
+			private:
+				inline void MoveFrom(ForElementType&& Other)
+				{
+					if (this == &Other)
+						return;
+
+					Free();
+
+					if (Other.SecondaryData)
+						SecondaryData = Other.SecondaryData;
+
+					memcpy(InlineData, Other.InlineData, InlineDataSizeBytes);
+
+					memset(Other.InlineData, 0x0, InlineDataSizeBytes);
+					Other.SecondaryData = nullptr;
+				}
+
+				inline void FitAllocation(const int32 OldNumElements, const int32 NewNumElements)
+				{
+					/* No need to do anything if NewSize still fits into InlineData */
+					if (NewNumElements <= NumInlineElements)
+					{
+						if (OldNumElements > NumInlineElements && SecondaryData)
+						{
+							memcpy(InlineData, SecondaryData, InlineDataSizeBytes);
+							FMemory::Free(SecondaryData);
+						}
+
+						return;
+					}
+
+					/* Allocates if SecondaryData is nullptr */
+					SecondaryData = reinterpret_cast<ElementType*>(FMemory::Realloc(SecondaryData, NewNumElements * ElementSize, ElementAlign));
+
+					if (OldNumElements < NumInlineElements)
+						memcpy(SecondaryData, InlineData, InlineDataSizeBytes);
+				}
+
 			public:
+				inline void CopyFrom(const ForElementType& Other, const int32 OldNumElements, const int32 NewNumElements)
+				{
+					FitAllocation(OldNumElements, NewNumElements);
+
+					if (Other.SecondaryData)
+					{
+						memcpy(SecondaryData, Other.SecondaryData, NewNumElements * ElementSize);
+					}
+					else
+					{
+						memcpy(InlineData, Other.InlineData, InlineDataSizeBytes);
+					}
+				}
+
 				inline void Free()
 				{
 					if (SecondaryData)
 						FMemory::Free(SecondaryData);
 
-					memset(InlineData, 0x0, sizeof(InlineData));
+					memset(InlineData, 0x0, InlineDataSizeBytes);
 				}
 
 			public:
@@ -191,11 +245,37 @@ namespace UC
 			{
 			}
 
+			FBitArray(const FBitArray& Other)
+			{
+				InitializeFrom(Other);
+			}
+
+			FBitArray(FBitArray&&) = default;
+
 		public:
 			FBitArray& operator=(FBitArray&&) = default;
 
-			/* BitArrays should never actively be deep-copied with this operator */
-			FBitArray& operator=(const FBitArray&) = delete;
+			FBitArray& operator=(const FBitArray& Other)
+			{
+				InitializeFrom(Other);
+
+				return *this;
+			}
+
+		private:
+			inline void InitializeFrom(const FBitArray& Other)
+			{
+				if (this == &Other)
+					return;
+
+				NumBits = Other.NumBits;
+				MaxBits = Other.MaxBits;
+
+				const int32 OldNumElements = MaxBits / NumBitsPerDWORD;
+				const int32 NewNumElements = Other.NumBits / NumBitsPerDWORD;
+
+				Data.CopyFrom(Other.Data, OldNumElements, NewNumElements);
+			}
 
 		private:
 			inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
@@ -206,7 +286,7 @@ namespace UC
 
 			inline const uint32* GetData() const { return reinterpret_cast<const uint32*>(Data.GetAllocation()); }
 
-			inline bool IsValidIndex(int32 Index) const { return Index > 0 && Index < NumBits; }
+			inline bool IsValidIndex(int32 Index) const { return Index >= 0 && Index < NumBits; }
 
 			inline bool IsValid() const { return GetData() && NumBits > 0; }
 
@@ -296,6 +376,12 @@ namespace UC
 		{
 		}
 
+		TArray(const TArray& Other)
+			: Data(nullptr), NumElements(0), MaxElements(0)
+		{
+			this->CopyFrom(Other);
+		}
+
 		TArray(TArray&& Other) noexcept
 			: Data(Other.Data), NumElements(Other.NumElements), MaxElements(Other.MaxElements)
 		{
@@ -328,12 +414,14 @@ namespace UC
 			return *this;
 		}
 
-	public:
-		/* Use 'TArray<Type>& MyRef = OtherArray;' by default. If you want to copy this array use the 'Clone()' function */
-		TArray(const TArray&) = delete;
+		TArray& operator=(const TArray& Other)
+		{
+			this->CopyFrom(Other);
 
-		/* Use 'TArray<Type>& MyRef = OtherArray;' by default. If you want to copy this array use the 'Clone()' function */
-		TArray& operator=(const TArray&) = delete;
+			return *this;
+		}
+
+	public:
 
 	private:
 		inline int32 GetSlack() const { return MaxElements - NumElements; }
@@ -410,15 +498,6 @@ namespace UC
 		}
 
 	public:
-		inline TArray Clone() const
-		{
-			TArray NewArray;
-			NewArray.CopyFrom(*this);
-
-			return NewArray;
-		}
-
-	public:
 		inline int32 Num() const { return NumElements; }
 		inline int32 Max() const { return NumElements; }
 
@@ -476,14 +555,6 @@ namespace UC
 			return L"";
 		}
 
-		inline FString Clone() const
-		{
-			FString NewString;
-			NewString.CopyFrom(*this);
-
-			return NewString;
-		}
-
 	public:
 		inline bool operator==(const FString& Other) const { return Other ? NumElements == Other.NumElements && wcscmp(Data, Other.Data) == 0 : false; }
 		inline bool operator!=(const FString& Other) const { return Other ? NumElements != Other.NumElements || wcscmp(Data, Other.Data) != 0 : true; }
@@ -511,13 +582,12 @@ namespace UC
 		{
 		}
 
-		TSparseArray(TSparseArray&& Other) = default;
+		TSparseArray(const TSparseArray&) = default;
+		TSparseArray(TSparseArray&&) = default;
 
 	public:
 		TSparseArray& operator=(TSparseArray&&) = default;
-
-		/* Use 'TSparseArray<Type>& MyRef = OtherArray;' by default. If you want to copy this array use the 'Clone()' function [not implemented] */
-		TSparseArray& operator=(const TSparseArray&) = delete;
+		TSparseArray& operator=(const TSparseArray&) = default;
 
 	private:
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
@@ -562,6 +632,67 @@ namespace UC
 		TSparseArray<SetDataType> Elements;
 		HashType Hash;
 		int32 HashSize;
+
+	public:
+		TSet()
+			: HashSize(0)
+		{
+		}
+
+		inline void checkf3()
+		{
+			constexpr int32 Offset = offsetof(TSet<int>, Hash);
+		}
+
+		TSet(TSet&& Other)
+		{
+			MoveFrom(std::move(Other));
+		}
+
+		/* Todo */
+		TSet(const TSet& Other)
+			: HashSize(0)
+		{
+			CopyFrom(Other);
+		}
+
+	public:
+		TSet& operator=(TSet&& Other) noexcept
+		{
+			MoveFrom(std::move(Other));
+
+			return *this;
+		}
+
+		TSet& operator=(const TSet& Other)
+		{
+			CopyFrom(Other);
+
+			return *this;
+		}
+
+	private:
+		inline void MoveFrom(TSet&& Other)
+		{
+			if (this == &Other)
+				return;
+
+			Elements = std::move(Other.Elements);
+			Hash = std::move(Other.Hash);
+			HashSize = Other.HashSize;
+
+			Other.HashSize = 0x0;
+		}
+
+		inline void CopyFrom(const TSet& Other)
+		{
+			if (this == &Other)
+				return;
+
+			Elements = Other.Elements;
+			Hash.CopyFrom(Other.Hash, HashSize, Other.HashSize);
+			HashSize = Other.HashSize;
+		}
 
 	private:
 		inline void VerifyIndex(int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }

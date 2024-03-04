@@ -55,22 +55,21 @@ DWORD MainThread(HMODULE Module)
 		UC::TArray<int> MyArray(3);
 
 		UC::TArray<int>& MyOtherArrayRef = MyArray;
-		UC::TArray<int> MyOtherArrayClone = MyArray.Clone();
+		UC::TArray<int> MyOtherArrayClone = MyArray;
 
 		UC::TArray<int> MyOtherArray(0x1);
-		MyOtherArray = MyArray.Clone();
+		MyOtherArray = MyArray;
 
 		UC::FString SomeStr = L"Hell world...";
 
 		UC::FString MyNewString(0x10);
-		MyNewString = SomeStr.Clone();
-
-		using Type = std::decay_t<const UC::FString&>;
+		MyNewString = SomeStr;
 
 		UC::TMap<float, UC::uint64> MapyMap;
 		UC::TMap<float, UC::uint64> Map2;
 
 		MapyMap = std::move(Map2);
+		MapyMap = Map2;
 
 		for (const UC::TPair<float, UC::uint64>& Pair : MapyMap)
 		{
@@ -83,7 +82,7 @@ DWORD MainThread(HMODULE Module)
 		}
 		std::wcout << std::endl;
 
-		UC::FString SomeClonedString = SomeStr.Clone();
+		UC::FString SomeClonedString = SomeStr;
 		for (wchar_t C : SomeClonedString)
 		{
 			std::wcout << C << "+";
@@ -92,6 +91,16 @@ DWORD MainThread(HMODULE Module)
 	}
 
 	std::cout << std::endl;
+
+	struct alignas(0x4) FName { UC::int32 CmpIdx, Number; };
+
+	UC::TMap<FName, float>& SomeMap = *reinterpret_cast<UC::TMap<FName, float>*>(0x000002C2334020E0 + 0x7c8);
+
+	for (const UC::TPair<FName, float>& Pairs : SomeMap)
+	{
+		std::cout << std::format("CmpIdx: 0x{:X}, Number: 0x{:X}, float: {}\n", Pairs.Key().CmpIdx, Pairs.Key().Number, Pairs.Value());
+	}
+
 	/*
 	UC::TArray<float> MyFloatingArray;
 	const UC::TArray<float> MyOtherArray;
