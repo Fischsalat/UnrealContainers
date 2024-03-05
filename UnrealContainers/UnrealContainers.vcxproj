@@ -147,6 +147,7 @@
     <ClInclude Include="Containers.h" />
     <ClInclude Include="ContainersRewrite.h" />
     <ClInclude Include="UnrealContainers.h" />
+    <ClInclude Include="UnrealContainersNoAlloc.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemGroup>

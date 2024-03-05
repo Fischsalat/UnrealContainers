@@ -13,7 +13,8 @@
 
 //using namespace UE;
 
-#include "UnrealContainers.h"
+//#include "UnrealContainers.h"
+#include "UnrealContainersNoAlloc.h"
 
 #define PRINTBOOL(b) std::cout << (b ? "true\n" : "false\n")
 
@@ -49,21 +50,22 @@ DWORD MainThread(HMODULE Module)
 	freopen_s(&f, "CONOUT$", "w", stderr);
 
 	/* Sig is only good for a few versions, not universal */
-	UC::FMemory::Init(FindPattern("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B F1 41 8B D8 48 8B 0D ? ? ? ? 48 8B FA 48 85 C9 75 ? E8"));
+	//UC::FMemory::Init(FindPattern("48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 41 56 48 83 EC ? 48 8D 59 ? 48 8B F9 48 8B CB 41 8B F1"));
 
 	{
-		UC::TArray<int> MyArray(3);
+		UC::TAllocatedArray<int> MyArray(3);
 
 		UC::TArray<int>& MyOtherArrayRef = MyArray;
 		UC::TArray<int> MyOtherArrayClone = MyArray;
 
-		UC::TArray<int> MyOtherArray(0x1);
+		UC::TAllocatedArray<int> MyOtherArray(0x1);
 		MyOtherArray = MyArray;
 
 		UC::FString SomeStr = L"Hell world...";
 
-		UC::FString MyNewString(0x10);
-		MyNewString = SomeStr;
+		UC::FAllocatedString MyNewString(0x10);
+
+		std::cout << MyNewString.ToString() << std::endl;
 
 		UC::TMap<float, UC::uint64> MapyMap;
 		UC::TMap<float, UC::uint64> Map2;
@@ -92,14 +94,23 @@ DWORD MainThread(HMODULE Module)
 
 	std::cout << std::endl;
 
-	struct alignas(0x4) FName { UC::int32 CmpIdx, Number; };
+	//for (int i = 0; i < 0x10000; i++)
+	//{
+	//	void* Ptr = UC::FMemory::Malloc((i % 2) == 0x0 ? 0x3 : 0x100, (i % 2) == 0x0 ? 0x0 : 0x40);
+	//
+	//	Ptr = UC::FMemory::Realloc(Ptr, (rand() % 0x400) + 1);
+	//
+	//	UC::FMemory::Free(Ptr);
+	//}
 
-	UC::TMap<FName, float>& SomeMap = *reinterpret_cast<UC::TMap<FName, float>*>(0x000002C2334020E0 + 0x7c8);
-
-	for (const UC::TPair<FName, float>& Pairs : SomeMap)
-	{
-		std::cout << std::format("CmpIdx: 0x{:X}, Number: 0x{:X}, float: {}\n", Pairs.Key().CmpIdx, Pairs.Key().Number, Pairs.Value());
-	}
+	//struct alignas(0x4) FName { UC::int32 CmpIdx, Number; };
+	//
+	//UC::TMap<FName, float>& SomeMap = *reinterpret_cast<UC::TMap<FName, float>*>(0x000002C2334020E0 + 0x7c8);
+	//
+	//for (const UC::TPair<FName, float>& Pairs : SomeMap)
+	//{
+	//	std::cout << std::format("CmpIdx: 0x{:X}, Number: 0x{:X}, float: {}\n", Pairs.Key().CmpIdx, Pairs.Key().Number, Pairs.Value());
+	//}
 
 	/*
 	UC::TArray<float> MyFloatingArray;
