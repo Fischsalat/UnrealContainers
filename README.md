@@ -57,7 +57,7 @@ for (UC::TPair<int, void*>& Pair : SomeMap)
     std::cout << Pair.second << std::endl;
 ```
 
-## UnrealContainersNoAlloc.h (used by https://github.com/Encryqed/Dumper-7)
+## UnrealContainersNoAlloc.h (used by [Dumper-7](https://github.com/Encryqed/Dumper-7))
 This is the third implementation, but without any allocating functionality (except c-style allocations from the standard-library). \
 Arrays or strings allocated by UnrealEngine **will not** be freed on destruction of the container. Be careful to avoid leaking too much memory. \
 Requires no offsets at all. \
