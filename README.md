@@ -7,7 +7,7 @@
 - TSet
 - TMap
 - TSparseArray
-- FBitARray
+- FBitArray
 
 ## Containers.h
 First implementation, may not compile. \
