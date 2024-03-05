@@ -1,5 +1,5 @@
 # UnrealContainers
-### UnrealEngine typs with iterators
+### UnrealEngine typs with iterators (use UnrealContainers.h or UnrealContainersNoAlloc.h)
 
 ## Supported Types:
 - TArray
@@ -57,7 +57,7 @@ for (UC::TPair<int, void*>& Pair : SomeMap)
     std::cout << Pair.second << std::endl;
 ```
 
-## UnrealContainersNoAlloc.h
+## UnrealContainersNoAlloc.h (used by https://github.com/Encryqed/Dumper-7)
 This is the third implementation, but without any allocating functionality (except c-style allocations from the standard-library). \
 Arrays or strings allocated by UnrealEngine **will not** be freed on destruction of the container. Be careful to avoid leaking too much memory. \
 Requires no offsets at all. \
