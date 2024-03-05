@@ -2,13 +2,19 @@
 #include <Windows.h>
 #include <iostream>
 #include <format>
+#include "Utils.h"
 //#include "Containers.h"
 
 //#include "ContainersRewrite.h"
-#include "ContainersRewrite.h"
+
+//#define WITH_ALLOCATOR 0
+
+//#include "ContainersRewrite.h"
 
 //using namespace UE;
 
+//#include "UnrealContainers.h"
+#include "UnrealContainersNoAlloc.h"
 
 #define PRINTBOOL(b) std::cout << (b ? "true\n" : "false\n")
 
@@ -32,17 +38,81 @@
 //	return false;
 //}
 
-namespace It = UC::Iterators;
+//namespace It = UC::Iterators;
 
 
-void Main()
-{	
+DWORD MainThread(HMODULE Module)
+{
 	AllocConsole();
 	FILE* f;
 	freopen_s(&f, "CONIN$", "r", stdin);
 	freopen_s(&f, "CONOUT$", "w", stdout);
 	freopen_s(&f, "CONOUT$", "w", stderr);
 
+	/* Sig is only good for a few versions, not universal */
+	//UC::FMemory::Init(FindPattern("48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 41 56 48 83 EC ? 48 8D 59 ? 48 8B F9 48 8B CB 41 8B F1"));
+
+	{
+		UC::TAllocatedArray<int> MyArray(3);
+
+		UC::TArray<int>& MyOtherArrayRef = MyArray;
+		UC::TArray<int> MyOtherArrayClone = MyArray;
+
+		UC::TAllocatedArray<int> MyOtherArray(0x1);
+		MyOtherArray = MyArray;
+
+		UC::FString SomeStr = L"Hell world...";
+
+		UC::FAllocatedString MyNewString(0x10);
+
+		std::cout << MyNewString.ToString() << std::endl;
+
+		UC::TMap<float, UC::uint64> MapyMap;
+		UC::TMap<float, UC::uint64> Map2;
+
+		MapyMap = std::move(Map2);
+		MapyMap = Map2;
+
+		for (const UC::TPair<float, UC::uint64>& Pair : MapyMap)
+		{
+			std::wcout << "Look at my value: " << Pair.Value() << std::endl;
+		}
+
+		for (wchar_t C : SomeStr)
+		{
+			std::wcout << C << "- ";
+		}
+		std::wcout << std::endl;
+
+		UC::FString SomeClonedString = SomeStr;
+		for (wchar_t C : SomeClonedString)
+		{
+			std::wcout << C << "+";
+		}
+		std::wcout << std::endl;
+	}
+
+	std::cout << std::endl;
+
+	//for (int i = 0; i < 0x10000; i++)
+	//{
+	//	void* Ptr = UC::FMemory::Malloc((i % 2) == 0x0 ? 0x3 : 0x100, (i % 2) == 0x0 ? 0x0 : 0x40);
+	//
+	//	Ptr = UC::FMemory::Realloc(Ptr, (rand() % 0x400) + 1);
+	//
+	//	UC::FMemory::Free(Ptr);
+	//}
+
+	//struct alignas(0x4) FName { UC::int32 CmpIdx, Number; };
+	//
+	//UC::TMap<FName, float>& SomeMap = *reinterpret_cast<UC::TMap<FName, float>*>(0x000002C2334020E0 + 0x7c8);
+	//
+	//for (const UC::TPair<FName, float>& Pairs : SomeMap)
+	//{
+	//	std::cout << std::format("CmpIdx: 0x{:X}, Number: 0x{:X}, float: {}\n", Pairs.Key().CmpIdx, Pairs.Key().Number, Pairs.Value());
+	//}
+
+	/*
 	UC::TArray<float> MyFloatingArray;
 	const UC::TArray<float> MyOtherArray;
 	
@@ -58,6 +128,8 @@ void Main()
 			Value = 9.6f;
 		}
 	}
+
+	//UC::FMemory::Init((void*)39);
 
 	UC::TMap<UC::FString, void*>& PluginStateMachines = *(UC::TMap<UC::FString, void*>*)(0);
 
@@ -132,6 +204,23 @@ void Main()
 	{
 		std::wcout << StrWChar0[i] << L", ";
 	}
+	*/
+
+	while (true)
+	{
+		if (GetAsyncKeyState(VK_F6) & 1)
+		{
+			fclose(stdout);
+			if (f) fclose(f);
+			FreeConsole();
+
+			FreeLibraryAndExitThread(Module, 0);
+		}
+
+		Sleep(100);
+	}
+
+	return 0;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
@@ -142,7 +231,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH: {
-		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Main, 0, 0, 0);
+		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)MainThread, hModule, 0, 0);
 		break;
 	}
 	case DLL_PROCESS_DETACH: {

@@ -13,15 +13,27 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Headerdateien\ForTesting">
+      <UniqueIdentifier>{913b053f-cbbb-46ab-b646-ccbc9a7b5a24}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CLASSES_FOR_TESTING.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="Containers.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="ContainersRewrite.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="UnrealContainers.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="CLASSES_FOR_TESTING.h">
+      <Filter>Headerdateien\ForTesting</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils.h">
+      <Filter>Headerdateien\ForTesting</Filter>
+    </ClInclude>
+    <ClInclude Include="UnrealContainersNoAlloc.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
