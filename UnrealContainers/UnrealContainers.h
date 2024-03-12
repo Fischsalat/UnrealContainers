@@ -20,34 +20,23 @@ namespace UC
 
 		inline int32 AllocCount = 0x0;
 
-		inline void Init(void* ReallocAddress)
+		[[nodiscard]] inline void Init(void* ReallocAddress)
 		{
-			if (EngineRealloc == nullptr) [[unlikely]]
-				EngineRealloc = reinterpret_cast<decltype(EngineRealloc)>(ReallocAddress);
+			EngineRealloc = reinterpret_cast<decltype(EngineRealloc)>(ReallocAddress);
 		}
 
-		inline void* Malloc(uint64 Size, uint32 Alignment = 0x0 /* auto */)
+		[[nodiscard]] inline void* Malloc(uint64 Size, uint32 Alignment = 0x0 /* auto */)
 		{
-			std::cout << " + AllocCount now: 0x" << std::hex << ++AllocCount << std::endl;
-
 			return EngineRealloc(nullptr, Size, Alignment);
 		}
 
 		inline void* Realloc(void* Ptr, uint64 Size, uint32 Alignment = 0x0 /* auto */)
 		{
-			if (!Ptr)
-				std::cout << " + AllocCount now: 0x" << std::hex << ++AllocCount << std::endl;
-
-			if (Size == 0x0)
-				std::cout << " - AllocCount now: 0x" << std::hex << --AllocCount << std::endl;
-
 			return EngineRealloc(Ptr, Size, Alignment);
 		}
 
 		inline void Free(void* Ptr)
 		{
-			std::cout << " - AllocCount now: 0x" << std::hex << --AllocCount << std::endl;
-
 			EngineRealloc(Ptr, 0x0, 0x0);
 		}
 	}
@@ -436,7 +425,9 @@ namespace UC
 		inline void Reserve(int32 Count)
 		{
 			if (GetSlack() < Count)
-				MaxElements += Count; FMemory::Realloc(Data, MaxElements, ElementAlign);
+				MaxElements += Count; 
+			
+			Data = static_cast<ArrayElementType*>(FMemory::Realloc(Data, MaxElements * ElementSize, ElementAlign));
 		}
 
 		inline void Add(const ArrayElementType& Element)
@@ -461,7 +452,7 @@ namespace UC
 				return;
 			}
 
-			Data = static_cast<ArrayElementType*>(FMemory::Realloc(Data, Other.NumElements, ElementAlign));
+			Data = static_cast<ArrayElementType*>(FMemory::Realloc(Data, Other.NumElements * ElementSize, ElementAlign));
 			MaxElements = Other.NumElements;
 			memcpy(Data, Other.Data, Other.NumElements * ElementSize);
 		}
@@ -743,7 +734,7 @@ namespace UC
 		const ContainerImpl::FBitArray& GetAllocationFlags() const { return Elements.GetAllocationFlags(); }
 
 	public:
-		inline decltype(auto) Find(const KeyElementType& Key, bool(*Equals)(const KeyElementType& Key, const ValueElementType& Value))
+		inline decltype(auto) Find(const KeyElementType& Key, bool(*Equals)(const KeyElementType& LeftKey, const KeyElementType& RightKey))
 		{
 			for (auto It = begin(*this); It != end(*this); ++It)
 			{
