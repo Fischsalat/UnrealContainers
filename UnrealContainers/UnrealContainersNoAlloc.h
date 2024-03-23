@@ -351,7 +351,7 @@ namespace UC
 		}
 
 	public:
-		inline       wchar_t* CStr() { return Data; }
+		inline       wchar_t* CStr()       { return Data; }
 		inline const wchar_t* CStr() const { return Data; }
 
 	public:
