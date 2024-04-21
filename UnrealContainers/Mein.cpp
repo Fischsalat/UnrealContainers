@@ -53,14 +53,6 @@ DWORD MainThread(HMODULE Module)
 	/* Sig is only good for a few versions, not universal */
 	//UC::FMemory::Init(FindPattern("48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 41 56 48 83 EC ? 48 8D 59 ? 48 8B F9 48 8B CB 41 8B F1"));
 
-	std::cout << "Look, GNames: " << FindPattern("48 89 05 ? ? ? ? 48 8D 4D E0 48 89 05 ? ? ? ? 48 8D 05") << std::endl;
-	std::cout << "Look, GObjects: " << FindPattern("48 8B 05 ? ? ? ? 48 8B 0C C8 48 85 C9 74 05 E8") << std::endl;
-
-	std::ofstream File(std::filesystem::current_path() / "MyFavoriteFile.txt");
-
-	File << "Look, GNames: " << FindPattern("48 89 05 ? ? ? ? 48 8D 4D E0 48 89 05 ? ? ? ? 48 8D 05") << std::endl;
-	File << "Look, GObjects: " << FindPattern("48 8B 05 ? ? ? ? 48 8B 0C C8 48 85 C9 74 05 E8") << std::endl;
-
 #ifndef FALSE
 	{
 		UC::TAllocatedArray<int> MyArray(3);

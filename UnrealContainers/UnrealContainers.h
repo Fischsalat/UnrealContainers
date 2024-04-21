@@ -30,7 +30,7 @@ namespace UC
 			return EngineRealloc(nullptr, Size, Alignment);
 		}
 
-		inline void* Realloc(void* Ptr, uint64 Size, uint32 Alignment = 0x0 /* auto */)
+		[[nodiscard]] inline void* Realloc(void* Ptr, uint64 Size, uint32 Alignment = 0x0 /* auto */)
 		{
 			return EngineRealloc(Ptr, Size, Alignment);
 		}
