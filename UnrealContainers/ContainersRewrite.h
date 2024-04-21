@@ -36,7 +36,7 @@ namespace UC /*UnrealContainers*/
 			Realloc_Internal = reinterpret_cast<decltype(Realloc_Internal)>(R);
 		}
 
-		inline void* Malloc(int32 Size, int32 Alignment = 0x0 /*auto*/)
+		[[nodiscard]] inline void* Malloc(int32 Size, int32 Alignment = 0x0 /*auto*/)
 		{
 			if constexpr (bUseEngineAllocation)
 			{
@@ -48,7 +48,7 @@ namespace UC /*UnrealContainers*/
 			return malloc(Size);
 		}
 
-		inline void* Realloc(void* Ptr, uint64 Size, uint32 Alignment = 0x0 /*auto*/)
+		[[nodiscard]] inline void* Realloc(void* Ptr, uint64 Size, uint32 Alignment = 0x0 /*auto*/)
 		{
 			if constexpr (bUseEngineAllocation)
 			{
@@ -266,7 +266,7 @@ namespace UC /*UnrealContainers*/
 
 		inline void Add(const ArrayDataType& Element)
 		{
-			if (GetSlack() > 0)
+			if (GetSlack() <= 0)
 				Reserve(3);
 
 			Data[NumElements] = Element;
@@ -295,7 +295,7 @@ namespace UC /*UnrealContainers*/
 	private:
 		inline int32 GetSlack() const { return MaxElements - NumElements; }
 
-		inline void Reserve(int32 Count) { MaxElements += Count; FMemory::Realloc(Data, MaxElements, TypeAlign); }
+		inline void Reserve(int32 Count) { MaxElements += Count; Data = static_cast<ArrayDataType*>(FMemory::Realloc(Data, MaxElements * TypeSize, TypeAlign)); }
 
 		inline void VerifyIndex (int32 Index) const { if (!IsValidIndex(Index)) throw std::out_of_range("Index was out of range!"); }
 

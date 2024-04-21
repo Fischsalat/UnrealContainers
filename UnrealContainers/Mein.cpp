@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 #include <Windows.h>
 #include <iostream>
 #include <format>
@@ -52,6 +53,7 @@ DWORD MainThread(HMODULE Module)
 	/* Sig is only good for a few versions, not universal */
 	//UC::FMemory::Init(FindPattern("48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 41 56 48 83 EC ? 48 8D 59 ? 48 8B F9 48 8B CB 41 8B F1"));
 
+#ifndef FALSE
 	{
 		UC::TAllocatedArray<int> MyArray(3);
 
@@ -91,6 +93,7 @@ DWORD MainThread(HMODULE Module)
 		}
 		std::wcout << std::endl;
 	}
+#endif
 
 	std::cout << std::endl;
 
