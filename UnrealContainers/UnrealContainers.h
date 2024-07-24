@@ -475,7 +475,7 @@ namespace UC
 		{
 			NumElements = 0;
 
-			if (!Data)
+			if (Data)
 				memset(Data, 0, NumElements * ElementSize);
 		}
 
